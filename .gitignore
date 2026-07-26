@@ -1,37 +1,13 @@
-# 忽略生成的图片文件夹（太大）
-generated-images/
-
-# 忽略临时文件
-*.tmp
-*.log
-*.bak
-*_bak_*
-
-# 忽略 Python 缓存
-__pycache__/
 *.pyc
-
-# 忽略临时脚本
-fix_*.py
-*_fix.py
-retry_*.py
-*_verify.py
-*_check.py
-*_analyze.py
-*migrate*.py
-diagnose.py
-phase_*.py
-full_*.py
-dedup_*.py
-final_*.py
-check_*.py
-parse_*.py
-analyze_*.py
-
-# 忽略进度文件
-*_progress.json
-*_failed.txt
-
-# 忽略备份文件
+__pycache__/
+*.log
+deities.js.bak*
+deities.js.original
 *.bak
-*.backup
+regen_progress.json
+master_fix_progress.json
+final_master_fix_progress.json
+*_failed.txt
+*_done.txt
+generated-images/individual/
+**/nul

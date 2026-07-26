@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>女性阴阳格切换 · 详解</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", "微软雅黑", sans-serif;
+    background: linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 100%);
+    min-height: 100vh;
+    padding: 40px 20px;
+    color: #2c3e50;
+  }
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  h1 {
+    text-align: center;
+    font-size: 1.8rem;
+    color: #1a1a2e;
+    margin-bottom: 12px;
+    letter-spacing: 2px;
+  }
+  .subtitle {
+    text-align: center;
+    color: #888;
+    font-size: 0.9rem;
+    margin-bottom: 36px;
+  }
+  .section-title {
+    font-size: 1.1rem;
+    font-weight: bold;
+    color: #16213e;
+    margin: 28px 0 12px 0;
+    padding-left: 12px;
+    border-left: 4px solid #e94560;
+  }
+  .card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 28px;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+  }
+  .image-wrap {
+    text-align: center;
+    margin-bottom: 28px;
+  }
+  .image-wrap img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+  }
+  .core-box {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: #fff;
+    border-radius: 16px;
+    padding: 28px;
+    margin-bottom: 24px;
+    text-align: center;
+  }
+  .core-box .label {
+    font-size: 0.85rem;
+    color: #aab;
+    margin-bottom: 8px;
+  }
+  .core-box .number {
+    font-size: 2.4rem;
+    font-weight: bold;
+    color: #ffd700;
+    letter-spacing: 6px;
+    margin-bottom: 4px;
+  }
+  .core-box .desc {
+    font-size: 1rem;
+    color: #ccc;
+    margin-top: 6px;
+  }
+  .organs {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 14px;
+  }
+  .organ-tag {
+    background: rgba(255,215,0,0.15);
+    border: 1px solid rgba(255,215,0,0.4);
+    color: #ffd700;
+    padding: 4px 14px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+  }
+  .vs-box {
+    background: linear-gradient(135deg, #e94560, #c2315d);
+    color: #fff;
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 24px;
+    text-align: center;
+  }
+  .vs-box h3 { font-size: 1.1rem; margin-bottom: 18px; }
+  .vs-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 40px;
+    flex-wrap: wrap;
+  }
+  .vs-item { text-align: center; }
+  .vs-item .n { font-size: 1.6rem; font-weight: bold; letter-spacing: 4px; color: #ffd700; }
+  .vs-item .l { font-size: 0.82rem; color: rgba(255,255,255,0.7); margin-top: 4px; }
+  .vs-arrow { font-size: 1.4rem; color: rgba(255,255,255,0.5); }
+  .vs-item.right .n { color: #a8e6cf; }
+  .highlight-note {
+    background: #fff8e1;
+    border-left: 4px solid #f39c12;
+    border-radius: 0 8px 8px 0;
+    padding: 14px 18px;
+    margin-top: 16px;
+    font-size: 0.92rem;
+    color: #5d4e37;
+    line-height: 1.7;
+  }
+  .p {
+    font-size: 0.95rem;
+    line-height: 1.8;
+    color: #444;
+    margin-bottom: 10px;
+  }
+  .p:last-child { margin-bottom: 0; }
+  .quote {
+    background: #f0f4ff;
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin: 14px 0;
+    font-size: 0.9rem;
+    color: #334;
+    line-height: 1.7;
+    border-left: 3px solid #6c9fff;
+  }
+  .quote .src {
+    color: #888;
+    font-size: 0.8rem;
+    margin-top: 6px;
+  }
+  .num-grid {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin: 16px 0;
+    flex-wrap: wrap;
+  }
+  .num-item {
+    width: 52px;
+    height: 52px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+    font-weight: bold;
+    color: #fff;
+  }
+  .num-item.yang { background: linear-gradient(135deg, #e94560, #c2315d); }
+  .num-item.yin  { background: linear-gradient(135deg, #4a90d9, #2c6fad); }
+  .num-item.zero { background: linear-gradient(135deg, #888, #555); }
+  .grid-table {
+    display: flex;
+    justify-content: center;
+    margin: 16px 0;
+  }
+  table {
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+  th, td {
+    padding: 8px 18px;
+    text-align: center;
+    border: 1px solid #e0e0e0;
+  }
+  th { background: #f0f4ff; color: #333; font-weight: bold; }
+  td { color: #555; }
+  tr:nth-child(even) td { background: #fafafa; }
+  .footer {
+    text-align: center;
+    color: #aaa;
+    font-size: 0.78rem;
+    margin-top: 40px;
+    padding-top: 20px;
+    border-top: 1px solid #e0e0e0;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>女性阴阳格切换 · 详解</h1>
+<div class="subtitle">蓝馨 · 九宫格命理报告</div>
+
+<!-- 图片 -->
+<div class="card">
+  <div class="image-wrap">
+    <img src="阴阳格切换图.jpg" alt="阴阳格切换图">
+  </div>
+</div>
+
+<!-- 核心结论 -->
+<div class="core-box">
+  <div class="label">女性阳格周期 · 身体运行的系统</div>
+  <div class="number">13468</div>
+  <div class="desc">代表「阴（臓）」五大脏腑系统</div>
+  <div class="organs">
+    <span class="organ-tag">肺 1</span>
+    <span class="organ-tag">心 3</span>
+    <span class="organ-tag">肝 4</span>
+    <span class="organ-tag">肾 6</span>
+    <span class="organ-tag">脾 8</span>
+  </div>
+</div>
+
+<!-- 男女对比 -->
+<div class="vs-box">
+  <h3>阴阳格 · 男女运行逻辑相反</h3>
+  <div class="vs-row">
+    <div class="vs-item">
+      <div class="n">13468</div>
+      <div class="l">女性 · 阳格周期<br>运行「阴脏」系统</div>
+    </div>
+    <div class="vs-arrow">⇄</div>
+    <div class="vs-item right">
+      <div class="n">25790</div>
+      <div class="l">女性 · 阴格周期<br>运行「阳腑」系统</div>
+    </div>
+  </div>
+  <div style="margin-top:18px;color:rgba(255,255,255,0.65);font-size:0.88rem;">
+    ▲ 男性运行逻辑与女性相反：阳格运行阳腑（25790），阴格运行阴脏（13468）
+  </div>
+</div>
+
+<!-- 详细解释 -->
+<div class="card">
+  <div class="section-title">一、13468 代表的是「阴脏系统」</div>
+  <p class="p">在九宫格体系中，数字对应的人体脏腑分为阴阳两类：</p>
+  <div class="grid-table">
+    <table>
+      <tr><th>分类</th><th>数字</th><th>对应脏腑</th></tr>
+      <tr><td style="color:#4a90d9;font-weight:bold;">阴（臓）</td><td style="color:#4a90d9;font-weight:bold;">1 3 4 6 8</td><td>肺、心、肝、肾、脾</td></tr>
+      <tr><td style="color:#e94560;font-weight:bold;">阳（腑）</td><td style="color:#e94560;font-weight:bold;">2 5 7 9 0</td><td>大肠、胆、胃、膀胱、小肠</td></tr>
+    </table>
+  </div>
+
+  <div class="quote">
+    "13468 为阴（臓），25790 为阳（腑）"<br>
+    <span class="src">——《九宫格相关内容汇总》</span>
+  </div>
+
+  <div class="section-title">二、女性阳格周期运行「阴脏」</div>
+  <p class="p">根据阴阳格切换规则，女性和男性的运行逻辑恰好相反：</p>
+
+  <div class="num-grid">
+    <div class="num-item yin">1</div>
+    <div class="num-item yin">3</div>
+    <div class="num-item yin">4</div>
+    <div class="num-item yin">6</div>
+    <div class="num-item yin">8</div>
+  </div>
+  <div style="text-align:center;color:#4a90d9;font-size:0.88rem;margin-bottom:14px;">
+    阳格周期 · 阴脏系统（肺、心、肝、肾、脾）
+  </div>
+
+  <div class="num-grid">
+    <div class="num-item yang">2</div>
+    <div class="num-item yang">5</div>
+    <div class="num-item yang">7</div>
+    <div class="num-item yang">9</div>
+    <div class="num-item zero">0</div>
+  </div>
+  <div style="text-align:center;color:#e94560;font-size:0.88rem;margin-bottom:14px;">
+    阴格周期 · 阳腑系统（大肠、胆、胃、膀胱、小肠）
+  </div>
+
+  <div class="quote">
+    "女性的阴阳格切换：阳格为 13468（0）"<br>
+    <span class="src">——《九宫解译历史人物》</span>
+  </div>
+  <div class="quote">
+    "男性的阴阳格切换：阳格为 25790（腑为阳）"<br>
+    <span class="src">——《九宫解译历史人物》</span>
+  </div>
+
+  <div class="section-title">三、后面的「0」是什么意思？</div>
+  <p class="p">资料中显示为"阳格为 13468（0）"，这里的"0"指代小肠：</p>
+  <p class="p">
+    <strong>小肠</strong>五行属火，与心脏互为表里（心为脏，小肠为腑）。<br>
+    在分类中，0（小肠）归属阳（腑）系统，但在女性阳格周期的语境下，
+    资料将其标注在括号中作为补充说明——表明女性阳格期间，主要活跃的是
+    13468 这套阴脏系统，而 0（小肠）作为与心火相关的转化器官也被提及。
+  </p>
+
+  <div class="highlight-note">
+    <strong>⚠️ 重要提醒：</strong>您看到的"阳格为 13468"并非指您的九宫格数字变成了 13468，
+    而是指——<strong>作为女性，当您处于阳格的运势周期时，您的身体能量主要在
+    肺、心、肝、肾、脾这五大"阴脏"系统中流转和运作。</strong>
+    这是女性特有的阴阳运行规律。
+  </div>
+</div>
+
+<div class="footer">
+  蓝馨 · 九宫格命理报告 · 阴阳格详解
+</div>
+
+</div>
+</body>
+</html>
