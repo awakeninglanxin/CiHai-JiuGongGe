@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>实现大同 · 角色图鉴 — 四大文明 × 九宫格节点</title>
+<style>
+:root {
+  --bg: #050010;
+  --gold: #E8C268;
+  --purple: #9333EA;
+  --cyan: #06B6D4;
+  --rose: #FF4D6D;
+  --text: #FFFFFF;
+  --sub: #A8A8C2;
+  --card-bg: rgba(255,255,255,0.05);
+  --hypersapien: #4ade80;
+  --reptilian: #ef4444;
+  --protosapien: #a855f7;
+  --new_hybrids: #9ca3af;
+  --earth: #E8C268;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #000; color: var(--text);
+  font-family: 'Inter','Noto Sans SC','Noto Sans JP',sans-serif;
+  min-height: 100vh; overflow-x: hidden;
+}
+
+/* Header */
+.page-header {
+  text-align: center; padding: 32px 16px 8px;
+  background: radial-gradient(ellipse 50% 60% at 50% 0%, rgba(147,51,234,0.35) 0%, transparent 70%);
+}
+.page-header h1 { font-family: 'Noto Serif','SimSun',serif; font-size: 42px; font-weight: 900; color: var(--gold); letter-spacing: 4px; }
+.page-header p  { font-size: 14px; color: var(--sub); margin-top: 8px; letter-spacing: 2px; }
+
+/* Race Tabs */
+.race-tabs {
+  display: flex; justify-content: center; gap: 8px; flex-wrap: wrap;
+  padding: 16px; position: sticky; top: 0; z-index: 10;
+  background: rgba(5,0,16,0.92); backdrop-filter: blur(10px);
+}
+.race-tab {
+  padding: 8px 20px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.15);
+  cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.2s;
+  background: rgba(255,255,255,0.04); color: var(--sub);
+}
+.race-tab:hover { border-color: rgba(255,255,255,0.35); color: var(--text); }
+.race-tab.active { background: rgba(255,255,255,0.12); color: var(--text); border-color: var(--gold); }
+.race-tab[data-race="all"]       { border-color: rgba(232,194,104,0.4); }
+.race-tab[data-race="hypersapien"]  { border-color: rgba(74,222,128,0.5); }
+.race-tab[data-race="reptilian"]    { border-color: rgba(239,68,68,0.5); }
+.race-tab[data-race="protosapien"]  { border-color: rgba(168,85,247,0.5); }
+.race-tab[data-race="new_hybrids"]  { border-color: rgba(156,163,175,0.5); }
+
+/* Node filter bar */
+.node-bar {
+  display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; padding: 0 16px 12px;
+}
+.node-chip {
+  padding: 3px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;
+  border: 1px solid rgba(255,255,255,0.12); cursor: pointer;
+  background: rgba(255,255,255,0.04); color: var(--sub);
+  transition: all 0.15s;
+}
+.node-chip:hover { border-color: rgba(255,255,255,0.3); color: var(--text); }
+.node-chip.active { background: rgba(255,255,255,0.15); color: var(--text); }
+
+/* Stats */
+.stats-bar {
+  text-align: center; padding: 0 16px 8px; font-size: 13px; color: var(--sub);
+}
+
+/* Card grid */
+.roster-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px; padding: 16px 24px 32px;
+}
+
+/* Deity card (now clickable <a> link) */
+.roster-card {
+  display: flex; flex-direction: column; gap: 8px; padding: 14px;
+  background: var(--card-bg); border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.10);
+  transition: background 0.2s; text-decoration: none; color: inherit;
+}
+.roster-card:hover { background: rgba(255,255,255,0.08); }
+.roster-card .card-img {
+  width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px;
+}
+.roster-card .card-node {
+  font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 6px;
+  display: inline-block; width: fit-content;
+  background: rgba(255,255,255,0.08); color: var(--sub);
+}
+.roster-card .card-code {
+  font-family: 'JetBrains Mono','Consolas','Courier New',monospace;
+  font-size: 22px; font-weight: 400; color: var(--gold);
+  letter-spacing: 1px;
+}
+.roster-card .card-name {
+  font-family: 'Noto Serif','SimSun',serif; font-size: 17px; font-weight: 900; color: var(--text);
+}
+.roster-card .card-role {
+  font-size: 11px; color: var(--sub); line-height: 1.4;
+}
+.roster-card .card-races {
+  display: flex; gap: 4px; flex-wrap: wrap;
+}
+.race-badge {
+  font-size: 10px; padding: 1px 7px; border-radius: 4px; font-weight: 700;
+}
+.race-badge.hypersapien  { background: rgba(74,222,128,0.18); color: var(--hypersapien); }
+.race-badge.reptilian    { background: rgba(239,68,68,0.18); color: var(--reptilian); }
+.race-badge.protosapien  { background: rgba(168,85,247,0.18); color: var(--protosapien); }
+.race-badge.new_hybrids  { background: rgba(156,163,175,0.18); color: var(--new_hybrids); }
+
+/* Empty */
+.empty-state {
+  text-align: center; padding: 60px; color: var(--sub); font-size: 15px;
+}
+/* Layer separator */
+.layer-sep {
+  grid-column: 1 / -1;
+  font-size: 13px; font-weight: 700; color: var(--gold);
+  padding: 16px 4px 4px; margin-top: 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.10);
+  letter-spacing: 2px;
+}
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>实现大同 · 角色图鉴</h1>
+  <p>四大文明 × 九宫格节点 — 799位大神角色档案</p>
+</div>
+
+<div class="race-tabs" id="raceTabs"></div>
+<div class="node-bar" id="nodeBar"></div>
+<div class="stats-bar" id="statsBar"></div>
+<div class="roster-grid" id="rosterGrid"></div>
+
+<script src="deities.js"></script>
+<script>
+(function() {
+  var LAYERS = window.LAYERS;
+  var NODES = window.BASHAR_NODES;
+  var RACES = window.BASHAR_RACES;
+  var activeRace = "all";
+  var activeNode = -1;  // -1=全部, 0=四清玉皇, 1-9=Bashar节点
+
+  /* 收集所有大神扁平化 — 保留层信息 */
+  var allDeities = [];
+  LAYERS.forEach(function(layer) {
+    layer.deities.forEach(function(d) {
+      d._layerTitle = layer.title;  // 记下所属层
+      allDeities.push(d);
+    });
+  });
+
+  /* 渲染Race tab */
+  var raceTabsEl = document.getElementById("raceTabs");
+  var tabDefs = [
+    { key:"all",          label:"🌐 全部", count:allDeities.length },
+    { key:"hypersapien",  label:"α 超级智人 396", count:0 },
+    { key:"reptilian",    label:"β 爬虫人 324",   count:0 },
+    { key:"protosapien",  label:"γ 原初智人 471", count:0 },
+    { key:"new_hybrids",  label:"δ 新混血 651",   count:0 },
+  ];
+  tabDefs.forEach(function(td) {
+    if (td.key !== "all") {
+      td.count = allDeities.filter(function(d) { return d.races.indexOf(td.key) >= 0; }).length;
+    }
+    var btn = document.createElement("span");
+    btn.className = "race-tab" + (td.key === "all" ? " active" : "");
+    btn.setAttribute("data-race", td.key);
+    btn.textContent = td.label + " (" + td.count + ")";
+    btn.addEventListener("click", function() {
+      activeRace = td.key;
+      updateFilter();
+    });
+    raceTabsEl.appendChild(btn);
+  });
+
+  /* 渲染Node chip */
+  var nodeBarEl = document.getElementById("nodeBar");
+  var allChip = document.createElement("span");
+  allChip.className = "node-chip active";
+  allChip.textContent = "全部节点";
+  allChip.addEventListener("click", function() { activeRace = "all"; activeNode = -1; updateFilter(); });
+  nodeBarEl.appendChild(allChip);
+
+  // 后天童子 (node 0)
+  var qingChip = document.createElement("span");
+  qingChip.className = "node-chip";
+  qingChip.textContent = "0. 后天童子";
+  qingChip.addEventListener("click", function() { activeRace = "all"; activeNode = 0; updateFilter(); });
+  nodeBarEl.appendChild(qingChip);
+
+  for (var n = 1; n <= 13; n++) {
+    var chip = document.createElement("span");
+    chip.className = "node-chip";
+    chip.textContent = n + ". " + NODES[n].name;
+    (function(nodeId) {
+      chip.addEventListener("click", function() { activeRace = "all"; activeNode = nodeId; updateFilter(); });
+    })(n);
+    nodeBarEl.appendChild(chip);
+  }
+
+  var statsBarEl = document.getElementById("statsBar");
+  var rosterGridEl = document.getElementById("rosterGrid");
+
+  function updateFilter() {
+    /* 更新tab active */
+    raceTabsEl.querySelectorAll(".race-tab").forEach(function(t) {
+      t.classList.toggle("active", t.getAttribute("data-race") === activeRace);
+    });
+    /* 更新node chip active（index 0=全部, 1=四清玉皇, 2-10=节点1-9） */
+    nodeBarEl.querySelectorAll(".node-chip").forEach(function(c, i) {
+      if (i === 0) c.classList.toggle("active", activeNode === -1);
+      else if (i === 1) c.classList.toggle("active", activeNode === 0);
+      else c.classList.toggle("active", activeNode === (i - 1));
+    });
+
+    /* 筛选 */
+    var filtered = allDeities.filter(function(d) {
+      if (activeRace !== "all" && d.races.indexOf(activeRace) < 0) return false;
+      if (activeNode >= 0 && d.node !== activeNode) return false;
+      return true;
+    });
+
+    statsBarEl.textContent = "显示 " + filtered.length + " 位大神";
+
+    /* 渲染卡片 — 按维度层分组 */
+    rosterGridEl.innerHTML = "";
+    if (filtered.length === 0) {
+      rosterGridEl.innerHTML = '<div class="empty-state">该筛选条件下暂无大神<br><small style="color:var(--sub)">试试选择「🌐 全部」种族 + 特定节点</small></div>';
+      return;
+    }
+
+    var lastLayer = null;
+    filtered.forEach(function(d) {
+      // 层分隔标题
+      if (d._layerTitle !== lastLayer && !activeRace.startsWith("_race")) {
+        lastLayer = d._layerTitle;
+        var sep = document.createElement("div");
+        sep.className = "layer-sep";
+        sep.textContent = lastLayer;
+        rosterGridEl.appendChild(sep);
+      }
+
+      var card = document.createElement("a");
+      card.className = "roster-card";
+      card.href = "./九宫格数字组合生日日期/" + d.code + ".md";
+      card.target = "_blank";
+      card.rel = "noopener";
+
+      if (d.image) {
+        var img = document.createElement("img");
+        img.className = "card-img";
+        img.src = d.image;
+        img.alt = d.name;
+        img.loading = "lazy";
+        card.appendChild(img);
+      }
+
+      var codeEl = document.createElement("span");
+      codeEl.className = "card-code";
+      codeEl.textContent = d.code;
+      card.appendChild(codeEl);
+
+      var nd = NODES[d.node] || { name:"?" };
+      var nodeTag = document.createElement("span");
+      nodeTag.className = "card-node";
+      nodeTag.textContent = d.node === 0 ? "🌐 后天童子" : "⚛ " + d.node + ". " + nd.name + (nd.en ? " " + nd.en : "");
+      card.appendChild(nodeTag);
+
+      var nameEl = document.createElement("span");
+      nameEl.className = "card-name";
+      nameEl.textContent = d.name;
+      card.appendChild(nameEl);
+
+      var roleEl = document.createElement("span");
+      roleEl.className = "card-role";
+      roleEl.textContent = d.role;
+      card.appendChild(roleEl);
+
+      if (d.races && d.races.length > 0) {
+        var raceRow = document.createElement("div");
+        raceRow.className = "card-races";
+        d.races.forEach(function(rk) {
+          var rc = RACES[rk];
+          if (rc) {
+            var badge = document.createElement("span");
+            badge.className = "race-badge " + rk;
+            badge.textContent = rc.symbol + " " + rc.name;
+            raceRow.appendChild(badge);
+          }
+        });
+        card.appendChild(raceRow);
+      }
+
+      rosterGridEl.appendChild(card);
+    });
+  }
+
+  updateFilter();
+})();
+</script>
+</body>
+</html>
