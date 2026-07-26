@@ -9,5 +9,3 @@ master_fix_progress.json
 final_master_fix_progress.json
 *_failed.txt
 *_done.txt
-generated-images/individual/
-**/nul
