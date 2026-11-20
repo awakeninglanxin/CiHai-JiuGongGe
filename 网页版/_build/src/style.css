@@ -1,0 +1,418 @@
+/* ===== 慈海九宫格 · 即时解读 — 浅色纸本风 ===== */
+:root{
+  --paper:#fbfaf6;
+  --card:#ffffff;
+  --ink:#1e1b17;
+  --ink2:#5c564d;
+  --ink3:#8b8478;
+  --line:#e5dfd4;
+  --line2:#d5cdbe;
+  --accent:#9c5f2b;
+  --accent-soft:#f3e9dc;
+  --gold:#a8802a;
+  --yin:#2f6d8f;
+  --yin-soft:#e6f0f5;
+  --yang:#a8452a;
+  --yang-soft:#fbeae4;
+  --ok:#2f7a52;
+  --warn:#a8760f;
+  --radius:12px;
+  --mono:"JetBrains Mono",Consolas,"Courier New",monospace;
+  --serif:"Noto Serif SC","Source Han Serif SC","Songti SC",SimSun,serif;
+  --sans:-apple-system,"Segoe UI","Noto Sans SC","Microsoft YaHei",sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+
+/* ===== 阅读字号放大 3×（2026-11-20 加，师命「文字数字字号太小起码放大3倍」）=====
+   做法：整页 zoom 等比放大。字、行距、间距、盘格、边框一起放大，
+   不会出现「字放大了但 padding/格子没跟上」的错位。
+   版心不写死 max-width（见 .wrap），交给逻辑视口，否则 3× 下必然横向滚动。
+   要改倍数只动这一个 --zoom 值，别去逐个改 font-size。
+   ⚠ 导出 PNG 不受影响：那是手写 SVG 的逻辑坐标，不走页面样式。 */
+:root{ --zoom:3 }
+html{ zoom:var(--zoom) }
+/* 打印按原尺寸：300% 会把每页撑爆。版心与盘面列数也一并回原样。 */
+@media print{
+  html{ zoom:1 }
+  .wrap{ max-width:1180px; padding:0 22px 80px }
+  .plates{ grid-template-columns:1fr 1fr }
+}
+
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:15px;
+  line-height:1.7;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid var(--line2)}
+a:hover{border-bottom-color:var(--accent)}
+code{font-family:var(--mono);font-size:.88em;background:#f4f1ea;border:1px solid var(--line);
+  border-radius:4px;padding:.05em .35em}
+
+/* ===== 外壳 ===== */
+/* 3× 放大后逻辑视口约 = 屏幕宽/3，所以版心不能再锁 1180px（那是原尺寸的数）。
+   640px 逻辑 = 1920px 视觉，宽屏正好铺满、超宽屏居中留白。 */
+.wrap{max-width:640px;margin:0 auto;padding:0 12px 26px}
+
+/* ===== 页头 ===== */
+header.top{padding:34px 0 18px;border-bottom:1px solid var(--line);margin-bottom:22px}
+.brand{display:flex;flex-wrap:wrap;align-items:baseline;gap:12px}
+h1.brand-t{font-family:var(--serif);font-size:30px;font-weight:700;letter-spacing:3px;margin:0;color:var(--ink)}
+.brand-s{font-size:13px;color:var(--ink3);letter-spacing:1.5px}
+.lead{margin:10px 0 0;font-size:14px;color:var(--ink2);max-width:820px}
+
+/* ===== 全局参数卡 ===== */
+.panel{
+  background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  padding:18px 20px;margin:18px 0;
+}
+.panel-h{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:14px}
+.panel-h h2{font-family:var(--serif);font-size:16px;margin:0;letter-spacing:1.5px;color:var(--ink)}
+.panel-h .tail{font-size:12px;color:var(--ink3);margin-left:auto}
+
+.frow{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px 14px;align-items:end}
+.fld{display:flex;flex-direction:column;gap:5px;min-width:0}
+.fld label{font-size:12px;color:var(--ink3);letter-spacing:.5px}
+.fld input,.fld select{
+  font-family:var(--sans);font-size:14px;color:var(--ink);
+  background:#fff;border:1px solid var(--line2);border-radius:8px;
+  padding:8px 10px;width:100%;min-width:0;
+}
+.fld input:focus,.fld select:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
+.fld.wide{grid-column:span 2}
+.hint{font-size:11.5px;color:var(--ink3);line-height:1.5}
+
+.btn{
+  font-family:var(--sans);font-size:14px;font-weight:600;letter-spacing:1px;
+  color:#fff;background:var(--accent);border:1px solid var(--accent);
+  border-radius:8px;padding:9px 20px;cursor:pointer;white-space:nowrap;
+}
+.btn:hover{background:#84501f}
+.btn.ghost{background:#fff;color:var(--accent);border-color:var(--line2)}
+.btn.ghost:hover{background:var(--accent-soft)}
+.btn.sm{font-size:12.5px;padding:6px 13px;letter-spacing:.5px}
+
+/* ===== 标签页 ===== */
+nav.tabs{
+  display:flex;flex-wrap:wrap;gap:6px;margin:18px 0 0;
+  border-bottom:1px solid var(--line);padding-bottom:0;
+}
+nav.tabs button{
+  font-family:var(--sans);font-size:13.5px;color:var(--ink2);
+  background:transparent;border:1px solid transparent;border-bottom:2px solid transparent;
+  border-radius:8px 8px 0 0;padding:9px 14px;cursor:pointer;
+}
+nav.tabs button:hover{background:#f5f1e9;color:var(--ink)}
+nav.tabs button.on{
+  color:var(--accent);border-bottom-color:var(--accent);
+  background:#fff;font-weight:600;
+}
+nav.tabs button .no{font-family:var(--mono);font-size:10.5px;color:var(--ink3);margin-right:4px}
+
+section.tab{display:none;padding-top:20px}
+section.tab.on{display:block}
+
+/* ===== 通用卡片 ===== */
+.card{
+  background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  padding:18px 20px;margin:0 0 16px;
+}
+.card>h3{
+  font-family:var(--serif);font-size:16px;font-weight:700;letter-spacing:1px;
+  margin:0 0 6px;color:var(--ink);
+}
+.card>h3 .n{font-family:var(--mono);font-size:11px;color:var(--ink3);margin-right:6px}
+.card .sub{font-size:12.5px;color:var(--ink3);margin:0 0 12px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px}
+
+/* ===== 命盘主角卡 ===== */
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:700px){.duo{grid-template-columns:1fr}}
+.big{
+  border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;background:#fff;
+}
+.big.yin{border-color:#c5d8e3;background:linear-gradient(180deg,var(--yin-soft),#fff 70%)}
+.big.yang{border-color:#e8cec1;background:linear-gradient(180deg,var(--yang-soft),#fff 70%)}
+.big .k{font-size:12px;letter-spacing:2px;color:var(--ink3)}
+.big .v{font-family:var(--mono);font-size:30px;font-weight:600;letter-spacing:2px;line-height:1.25;word-break:break-all}
+.big.yin .v{color:var(--yin)}
+.big.yang .v{color:var(--yang)}
+.big .m{font-size:12px;color:var(--ink2);margin-top:4px;word-break:break-word}
+
+/* ===== 数字珠链 ===== */
+.beads{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 2px}
+.bead{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  width:46px;height:46px;border-radius:50%;border:1.5px solid var(--line2);
+  background:#fff;font-family:var(--mono);font-size:17px;font-weight:600;line-height:1;
+}
+.bead small{font-family:var(--sans);font-size:9.5px;font-weight:400;color:var(--ink3);margin-top:2px}
+.bead.y{border-color:#e0b7a6;background:var(--yang-soft);color:var(--yang)}
+.bead.n{border-color:#b6cfdd;background:var(--yin-soft);color:var(--yin)}
+.bead.miss{border-style:dashed;border-color:#c9c2b4;background:#faf8f3;color:#b3ab9c}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--ink3);margin-top:10px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px;border:1px solid}
+
+/* ===== 键值表 ===== */
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;font-size:13.5px;align-items:baseline}
+.kv dt{color:var(--ink3);white-space:nowrap}
+.kv dd{margin:0;color:var(--ink);word-break:break-word}
+@media(max-width:520px){.kv{grid-template-columns:1fr;gap:2px}.kv dd{margin-bottom:8px}}
+
+/* ===== 徽章 ===== */
+.tag{
+  display:inline-block;font-size:11.5px;line-height:1.6;padding:1px 8px;border-radius:999px;
+  border:1px solid var(--line2);background:#f8f5ef;color:var(--ink2);white-space:nowrap;
+}
+.tag.a{border-color:#ddc9ae;background:var(--accent-soft);color:var(--accent)}
+.tag.ok{border-color:#bcd9c8;background:#eef7f1;color:var(--ok)}
+.tag.warn{border-color:#e8d9a8;background:#fdf7e4;color:var(--warn)}
+.tag.lv1{border-color:#e0b0a4;background:#fbebe6;color:#a8452a}
+.tag.lv2{border-color:#e2d3a2;background:#fbf5e2;color:#8a6a11}
+.tag.lv0{border-color:var(--line2);background:#f7f5f0;color:var(--ink3)}
+.tag.n{border-color:#b9d2e0;background:#eef4f8;color:var(--yin)}
+.tag.y{border-color:#e0bda9;background:#fbf0e8;color:var(--yang)}
+.miss{display:inline-block;padding:0 5px;border:1px dashed #c9c2b4;border-radius:4px;background:#faf8f3;color:#8f8776;font-size:12px}
+.carried{display:inline-block;padding:0 5px;border-radius:4px;background:#f4f2ec;color:#8f8776;font-size:12px}
+
+/* ===== 表格 ===== */
+.tw{overflow-x:auto;margin:6px 0 4px;-webkit-overflow-scrolling:touch}
+table{border-collapse:collapse;width:100%;font-size:13px;min-width:420px}
+th,td{border:1px solid var(--line);padding:6px 9px;text-align:left;vertical-align:top}
+th{background:#f7f4ee;font-weight:600;color:var(--ink2);white-space:nowrap}
+tbody tr:nth-child(even){background:#fcfbf8}
+td.num,th.num{font-family:var(--mono);text-align:center;white-space:nowrap}
+
+/* ===== 报告正文（markdown 渲染） ===== */
+.md{font-size:14.5px;line-height:1.85}
+.md h1{font-family:var(--serif);font-size:23px;letter-spacing:2px;margin:6px 0 14px;
+  padding-bottom:10px;border-bottom:2px solid var(--accent-soft)}
+.md h2{font-family:var(--serif);font-size:18px;margin:26px 0 10px;padding-left:10px;
+  border-left:3px solid var(--accent);letter-spacing:1px}
+.md h3{font-family:var(--serif);font-size:15.5px;margin:18px 0 8px;color:var(--ink)}
+.md h4{font-size:14px;margin:14px 0 6px;color:var(--ink2)}
+.md p{margin:8px 0}
+.md ul,.md ol{margin:8px 0;padding-left:22px}
+.md li{margin:3px 0}
+.md li.nested{margin-left:18px;list-style:circle}
+.md blockquote{
+  margin:10px 0;padding:8px 14px;border-left:3px solid var(--line2);
+  background:#f8f6f1;color:var(--ink2);border-radius:0 8px 8px 0;
+}
+.md blockquote p{margin:3px 0}
+.md hr{border:0;border-top:1px solid var(--line);margin:20px 0}
+.md strong{font-weight:700;color:var(--ink)}
+.md table{min-width:480px}
+
+/* ===== 周期时间轴 ===== */
+.tl{position:relative;margin:8px 0 0;overflow-x:auto;padding-bottom:6px}
+.tl svg{display:block}
+
+/* ===== 搜索 / 列表 ===== */
+.searchbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px}
+.searchbar input{
+  flex:1 1 220px;min-width:0;font-size:14px;padding:8px 12px;border:1px solid var(--line2);
+  border-radius:8px;background:#fff;color:var(--ink);font-family:var(--sans);
+}
+.searchbar .count{font-size:12.5px;color:var(--ink3);white-space:nowrap}
+.rows{display:flex;flex-direction:column;gap:0}
+.rowitem{
+  display:grid;grid-template-columns:88px 1fr auto;gap:12px;align-items:baseline;
+  padding:9px 4px;border-bottom:1px solid var(--line);font-size:13.5px;
+}
+.rowitem:last-child{border-bottom:0}
+.rowitem .code{font-family:var(--mono);font-size:14px;color:var(--accent);font-weight:600}
+.rowitem .nm{color:var(--ink)}
+.rowitem .nm em{font-style:normal;color:var(--ink3);font-size:12px;margin-left:8px}
+.rowitem .rt{font-size:12px;color:var(--ink3);text-align:right;white-space:nowrap}
+@media(max-width:600px){.rowitem{grid-template-columns:76px 1fr}.rowitem .rt{display:none}}
+
+/* 条形 */
+.bars{display:flex;flex-direction:column;gap:5px}
+.bar{display:grid;grid-template-columns:74px 1fr 66px;gap:10px;align-items:center;font-size:12.5px}
+.bar .c{font-family:var(--mono);color:var(--accent);font-weight:600}
+.bar .t{height:11px;background:#f1ede5;border-radius:6px;overflow:hidden}
+.bar .t i{display:block;height:100%;background:linear-gradient(90deg,#c89a63,#9c5f2b);border-radius:6px}
+.bar .n{font-family:var(--mono);color:var(--ink3);text-align:right;font-size:11.5px}
+
+/* ===== 注释块 ===== */
+.note{
+  border:1px solid #e6dcbc;background:#fdfaf0;border-radius:10px;
+  padding:11px 14px;font-size:13px;color:#6f5c22;margin:12px 0;
+}
+.note b{color:#5a4a15}
+.note.blue{border-color:#c9dbe6;background:#f4f9fc;color:#2f5b73}
+.note.blue b{color:#234a5e}
+.note.warn{border-color:#e6c9c0;background:#fdf3f0;color:#8a4530}
+.note.warn b{color:#6d3623}
+
+/* ===== 空态 ===== */
+.empty{
+  border:1px dashed var(--line2);border-radius:var(--radius);padding:28px 20px;
+  text-align:center;color:var(--ink3);font-size:13.5px;background:#fdfcf9;
+}
+
+/* ===== 打印 ===== */
+/* ===== 稀有度（第 9 页） ===== */
+.bh{font-size:13px;color:var(--ink2);margin:0 0 8px;font-weight:600}
+.bars.rare .bar .t i{background:linear-gradient(90deg,#9dc0d2,#2f6d8f)}
+#st-buckets .bar{grid-template-columns:86px 1fr 122px}
+#st-buckets .bar .n{text-align:right}
+.rarhead{display:grid;grid-template-columns:146px 1fr;gap:18px;align-items:center}
+.rarscore{border:1px solid var(--line2);border-radius:14px;background:linear-gradient(180deg,#fffdf8,#f6f1e6);padding:16px 10px;text-align:center}
+.rarscore b{display:block;font-family:var(--serif);font-size:34px;line-height:1.05;color:var(--accent);font-weight:700}
+.rarscore span{display:block;margin-top:6px;font-size:11.5px;color:var(--ink3)}
+.rartxt p{font-size:13.5px;line-height:1.75}
+.wt{display:inline-block;margin-left:6px;font-size:11px;color:var(--ink3);font-family:var(--mono)}
+tr.sumrow td{background:#faf7f0;font-weight:600}
+@media(max-width:700px){.rarhead{grid-template-columns:1fr;gap:10px}.rarscore b{font-size:30px}}
+
+/* 频率页布局 */
+.freq2{display:grid;grid-template-columns:1fr 1fr;gap:18px 24px}
+@media(max-width:860px){.freq2{grid-template-columns:1fr}}
+.chipline{display:inline-flex;flex-wrap:wrap;gap:5px;vertical-align:middle}
+.chip{font-family:var(--mono);font-size:11.5px;line-height:1.6;padding:1px 6px;border:1px solid var(--line);
+  border-radius:5px;background:#f8f5ef;color:var(--ink2);white-space:nowrap}
+
+/* ===== 历史档案 · 生辰参数数据表 ===== */
+.hist-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:12px 0 10px}
+.hist-bar .count{font-size:12.5px;color:var(--ink3);white-space:nowrap;margin-right:4px}
+.hist-sw{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;color:var(--ink2);white-space:nowrap;cursor:pointer}
+.hist-sw input{margin:0;accent-color:var(--accent)}
+.hist-sel{font:inherit;font-size:12.5px;padding:3px 6px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink2)}
+.hist-bar .btn:disabled{opacity:.45;cursor:not-allowed}
+#histStat{margin-top:-4px;color:var(--ink3)}
+.hist-tbl{min-width:1180px;font-size:12.5px}
+.hist-tbl th{background:#f7f3ea;white-space:nowrap;font-weight:600}
+.hist-tbl td{white-space:nowrap;vertical-align:middle}
+.hist-tbl td .btn{padding:3px 9px;font-size:11.5px}
+.hist-tbl .nowrap{white-space:nowrap}
+.hist-tbl.is-empty{min-width:0}
+.hist-tbl.is-empty .empty{text-align:left}
+/* ── 表头排序（2026-11-14 加）：数值列先降序排行、文字列先升序，第三次回默认 ── */
+.hist-tbl th.s-th{cursor:pointer;user-select:none;position:relative;padding-right:15px}
+.hist-tbl th.s-th:hover{background:#efe6d6;color:var(--accent)}
+.hist-tbl th.s-th .ar{position:absolute;right:3px;top:50%;transform:translateY(-50%);
+  font-size:10px;line-height:1;color:var(--ink3);opacity:.28;pointer-events:none}
+.hist-tbl th.s-th:hover .ar{opacity:.6}
+.hist-tbl th.s-th.on{background:var(--accent-soft);color:var(--accent)}
+.hist-tbl th.s-th.on .ar{opacity:1;color:var(--accent);font-size:9px}
+.hist-tbl th.no-sort{color:var(--ink3);font-weight:400}
+.hist-tbl .hunit{font-size:10px;color:var(--gold);margin-left:1px}
+.hist-tbl td.hist-rar{font-variant-numeric:tabular-nums}
+.hist-tbl td.hist-rar b{font-weight:600}
+.hist-tbl td.hist-rar .b{font-size:10.5px;font-weight:400;color:var(--ink3);margin-left:3px}
+.hist-tbl tr.rank-top td{background:#fdf8ec}
+#histSortNow{color:var(--accent)}
+#histSortReset{border-bottom-style:dotted}
+@media(max-width:700px){.hist-bar{gap:6px}}
+/* ── 数字格谱系归属（2.3 / 2.4，2026-11-15） ── */
+.ln-q{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0 10px}
+.ln-q label{font-size:13px;font-weight:700;white-space:nowrap}
+.ln-q input{flex:1 1 220px;min-width:150px;max-width:330px;padding:7px 10px;font-size:13px;
+  font-family:var(--mono);border:1px solid var(--line);border-radius:7px;background:#fff;color:var(--ink)}
+.ln-chips{display:flex;flex-wrap:wrap;gap:5px}
+.ln-chips .btn{padding:3px 8px;font-family:var(--mono);font-size:11.5px}
+.ln-res{border:1px solid var(--line);border-radius:9px;padding:12px 14px;background:var(--paper2, #fcfbf7)}
+.ln-head{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.ln-code{font-family:var(--mono);font-size:20px;letter-spacing:.5px}
+.ln-name{font-size:14px;margin:6px 0 10px;line-height:1.6}
+.ln-src{color:var(--ink3);font-size:12px;font-weight:400;line-height:1.6}
+.ln-ar{color:var(--ink3);align-self:center;padding:0 2px}
+.ln-no{color:#1d6b3f}
+.ln-res .kv{margin:0}
+.ln-res .kv dd{line-height:1.7}
+.ln-path{margin:16px 0;padding:12px 14px;border:1px solid var(--line);border-radius:9px}
+.ln-path-t{font-size:13.5px;font-weight:700;margin-bottom:8px}
+.ln-path .beads{margin:6px 0 8px}
+.ln-fruit{border-color:var(--accent, #9a6b2f)}
+.ln-stages{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch}
+.ln-stage{flex:1 1 160px;min-width:140px;border:1px solid var(--line);border-radius:8px;
+  padding:9px 10px;background:#fff}
+.ln-stage.is-fruit{border-color:#b8801f;background:#fff9ea}
+.ln-stage-c{font-family:var(--mono);font-size:17px;font-weight:700}
+.ln-stage-n{font-size:12.5px;margin:3px 0;line-height:1.5}
+.ln-stage-s{font-size:11.5px;color:var(--ink3);line-height:1.5}
+@media(max-width:760px){
+  .ln-q input{max-width:none;flex-basis:100%}
+  .ln-stage{flex-basis:100%}
+  .ln-stages>.ln-ar{display:none}
+}
+@media print{.hist-tbl{min-width:0}}
+
+@media print{
+  nav.tabs,.panel,header.top .lead,.btn,.no-print{display:none!important}
+  body{background:#fff;font-size:11pt}
+  section.tab{display:block!important;page-break-before:always}
+  section.tab:first-of-type{page-break-before:auto}
+  .card{border:0;padding:0}
+  .md h2{border-left:0;padding-left:0;border-bottom:1px solid #999}
+  .tw{overflow:visible}
+  table{min-width:0;font-size:9.5pt}
+}
+
+/* ===== 九宫盘面（2026-11-20 加，同日改元宝风格）=====
+   数字固定五行色 + 甲字形 + 角标四角分工。只搬「排盘制图」手法，
+   不搬别人的卦位方位名 —— 慈海只定义「数字→脏腑」，没定义卦位。
+   底色只编码「这个数字的脏腑五行」，不编码在不在格 —— 那由数字深浅、角标表达。
+   1/2 金白 · 3 火红 · 4/5 木绿 · 6/0 水紫 · 7/8/9 土黄。 */
+/* 3× 放大后逻辑视口只有约 640px，两副盘并排会把格子撑出视口（阴格第三列被裁）。
+   改单列堆叠：每格宽度 ≈ 190 逻辑，数字/格 比例与原版一致，只是整体放大 3 倍。 */
+.plates{display:grid;grid-template-columns:1fr;gap:14px;margin-top:16px}
+.plate{border:1px solid var(--line);border-radius:var(--radius);background:#fff;padding:12px 12px 10px}
+.plate-hd{display:flex;align-items:baseline;gap:9px;margin-bottom:9px;flex-wrap:wrap}
+.plate-hd .t{font-family:var(--serif);font-weight:700;font-size:14.5px;color:#6b5ce7}
+.plate-hd .g{font-family:var(--mono);font-size:13px;color:var(--ink3);letter-spacing:1px}
+.plate-hd .when{font-size:11px;color:var(--ink3);margin-left:auto}
+.plate-group{grid-column:1/-1;font-size:12px;font-weight:600;color:#6b5ce7;
+  border-bottom:1px solid var(--line);padding-bottom:5px;margin-top:4px}
+.pgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
+.pcell{position:relative;aspect-ratio:1/1;border:1px solid #ded9d0;border-radius:7px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff}
+.pcell .n{font-family:var(--mono);font-size:24px;font-weight:700;line-height:1;color:#6b5ce7}
+.pcell .o{font-size:10.5px;color:#5c564d;margin-top:3px;letter-spacing:.4px}
+.pcell .o i{font-style:normal;color:#c0392b;font-weight:600}
+.pcell.d1,.pcell.d2{background:#ffffff;border-color:#ded9d0}
+.pcell.d3{background:#f6a8a2;border-color:#e9908a}
+.pcell.d4,.pcell.d5{background:#d5efda;border-color:#b6dfbf}
+.pcell.d6,.pcell.d0{background:#ded8f7;border-color:#c6bdf0}
+.pcell.d7,.pcell.d8,.pcell.d9{background:#fde9b5;border-color:#efd791}
+/* 甲字形：0 作第 10 格，落在第 4 行正中 */
+.pcell.d0{grid-column:2;margin-top:5px}
+.pcell .mk{position:absolute;font-size:10.5px;line-height:1.05;font-family:var(--mono);font-weight:600;
+  letter-spacing:1px;max-width:calc(100% - 8px);word-break:break-all}
+.pcell .mk-aux{top:4px;left:5px;color:#6b5ce7}
+.pcell .mk-main{top:4px;right:5px;color:#3f36a8}
+.pcell .mk-po{bottom:4px;left:5px;color:#e04b43}
+.pcell .mk-miss{bottom:4px;right:5px;color:#7a7a7a}
+.pfoot{font-size:11px;color:var(--ink3);margin-top:9px;line-height:1.55}
+@media (max-width:760px){ .plates{grid-template-columns:1fr} }
+@media print{ .pcell{break-inside:avoid} .plate{break-inside:avoid} }
+.plate-bar{display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap}
+.plate-bar .hint{font-size:11.5px;color:var(--ink3)}
+
+/* ===== 养生穴位（2026-11-20 加，照元宝版浅紫卡风格）===== */
+.acu-sec{margin-top:14px}
+.acu-sec-t{font-family:var(--serif);font-weight:700;font-size:15px;color:#4a3fbf;
+  display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.acu-sec-t:before{content:'✳';color:#8b7ff0}
+.acu-sec-n{font-family:var(--mono);font-size:11.5px;font-weight:400;color:var(--ink3);
+  margin-left:auto;letter-spacing:.3px}
+.acu{border:1px solid #d9d2f5;background:#f4f2fd;border-radius:10px;padding:9px 12px;margin-bottom:8px}
+.acu-hd{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.acu-pt{font-family:var(--serif);font-size:16px;color:#3f36a8}
+.acu-py{font-size:11.5px;color:#7a70c9;letter-spacing:.5px}
+.acu-tag{margin-left:auto;font-size:10.5px;color:#5a4fd0;background:#e6e1fb;
+  border:1px solid #d3cbf6;border-radius:20px;padding:1px 9px;white-space:nowrap}
+.acu-mer{font-size:12px;color:#5c564d;margin-top:4px}
+.acu-mer b{color:#3f36a8;font-family:var(--mono)}
+.acu-loc{font-size:11.5px;color:var(--ink3);margin-top:3px;line-height:1.6}
+.acu-note{font-size:11.5px;color:var(--ink3);margin-top:3px}
+.acu-sub{font-size:11.5px;color:var(--ink3);margin:10px 0 6px}
+.acu-sec-n-sub{font-family:var(--serif);font-weight:700;font-size:14px;color:#4a3fbf;
+  margin:16px 0 8px;padding-top:10px;border-top:1px dashed #e0daf7}

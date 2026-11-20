@@ -1,0 +1,393 @@
+<div class="wrap">
+
+  <header class="top">
+    <div class="brand">
+      <h1 class="brand-t">慈海九宫格 · 即时解读</h1>
+      <span class="brand-s">卢先生体系 · 阴阳双格 · 与 Python 引擎逐字节一致</span>
+    </div>
+    <p class="lead">
+      输入阳历生日与时辰，即时算出<strong>阳格 / 阴格 / 阳缺 / 阴缺 / 半补</strong>，并给出组合解读、跌落路径与数字格谱系归属、
+      综合命理报告、倪海厦六经辨证建议、食疗动功方案、行运共振与阴阳格周期。
+      全部算法由 <code>核心引擎/nine_palace_core_v5.py</code> 与 <code>查询工具/</code> 移植而来，
+      农历走 1900–2101 全表（73,779 天与 <code>lunarcalendar</code> 零差异）。
+    </p>
+  </header>
+
+  <!-- ============ 全局生辰参数 ============ -->
+  <div class="panel" id="paramPanel">
+    <div class="panel-h">
+      <h2>生辰参数</h2>
+      <span class="tail" id="paramTail">—</span>
+    </div>
+    <div class="frow">
+      <div class="fld">
+        <label for="fName">姓名（可留空）</label>
+        <input id="fName" type="text" placeholder="小李" autocomplete="off">
+      </div>
+      <div class="fld">
+        <label for="fBirth">阳历生日</label>
+        <input id="fBirth" type="date" min="1900-01-01" max="2101-12-31" value="2012-12-21">
+      </div>
+      <div class="fld">
+        <label for="fShichen">时辰</label>
+        <select id="fShichen">
+          <option value="子时">子时（23-01，按双格算）</option>
+          <option value="前子时">前子时（23:00-00:00）</option>
+          <option value="后子时">后子时（00:00-01:00）</option>
+          <option value="丑时">丑时（01-03）</option>
+          <option value="寅时">寅时（03-05）</option>
+          <option value="卯时">卯时（05-07）</option>
+          <option value="辰时">辰时（07-09）</option>
+          <option value="巳时" selected>巳时（09-11）</option>
+          <option value="午时">午时（11-13）</option>
+          <option value="未时">未时（13-15）</option>
+          <option value="申时">申时（15-17）</option>
+          <option value="酉时">酉时（17-19）</option>
+          <option value="戌时">戌时（19-21）</option>
+          <option value="亥时">亥时（21-23）</option>
+          <option value="未知">不确定</option>
+        </select>
+      </div>
+      <div class="fld">
+        <label for="fGender">性别</label>
+        <select id="fGender">
+          <option value="male" selected>男</option>
+          <option value="female">女</option>
+        </select>
+      </div>
+      <div class="fld">
+        <label for="fClock">出生钟点（可选，算真太阳时）</label>
+        <input id="fClock" type="time">
+      </div>
+      <div class="fld">
+        <label for="fCity">出生地（可选，算真太阳时）</label>
+        <input id="fCity" type="text" placeholder="如 深圳 / 或 22.54,114.06" list="cityList" autocomplete="off">
+        <datalist id="cityList"></datalist>
+      </div>
+      <div class="fld">
+        <label for="fRule">子时换日规则</label>
+        <select id="fRule">
+          <option value="book" selected>原书口径：前子时→后一天 / 后子时→前一天</option>
+          <option value="query">查询工具原样：前子时→后一天 / 后子时不换日</option>
+          <option value="v5">核心引擎 v5：前子时→前一天 / 后子时→后一天</option>
+        </select>
+      </div>
+      <div class="fld" style="flex-direction:row;gap:8px;align-items:flex-end">
+        <button class="btn" id="btnRun" type="button">开始解读</button>
+        <button class="btn ghost" id="btnDemo" type="button">示例</button>
+      </div>
+    </div>
+    <p class="hint" id="paramHint">
+      生日范围 1900–2101。填「钟点 + 出生地」会按经纬度换算真太阳时，并在下方提示实际时辰是否跨档；只填时辰则直接按该时辰计算。
+    </p>
+  </div>
+
+  <nav class="tabs" id="tabs"></nav>
+
+  <main id="views">
+
+    <!-- ============ 0 命盘概要 ============ -->
+    <section class="tab" id="tab-0">
+      <div class="card">
+        <h3><span class="n">0.1</span>阴阳双格</h3>
+        <p class="sub" id="q-caption">—</p>
+        <div class="duo" id="q-duo"></div>
+        <div class="legend" id="q-legend"></div>
+        <!-- 九宫盘面（2026-11-20 加）：线性格串 → 3×3，0 出盘 -->
+        <div class="plates" id="q-plates"></div>
+        <div class="plate-bar">
+          <button class="btn ghost sm" id="btnExportPlate" type="button">⤓ 导出命盘长图（PNG）</button>
+          <span class="hint">阴阳两盘 + 生辰信息，2× 高清，可直接发微信</span>
+        </div>
+        <p class="sub" style="margin:8px 0 0">
+          盘面符号（原版口径，《卢先生社群答疑》第 274 条）：
+          <b>■ 方块＝主魂</b>　<b>▲ 三角＝辅魂</b>　<b style="color:#e04b43">○ 圆圈＝魄</b>　
+          <b>★ 星星＝缺漏</b>；同一符号重复几个，就是该数字出现几次。
+        </p>
+      </div>
+
+      <div class="grid2">
+        <div class="card">
+          <h3><span class="n">0.2</span>数字珠链 · 阳格</h3>
+          <p class="sub">每一颗即阳格中的一位数字；浅蓝＝阴（脏），浅赭＝阳（腑），虚线＝缺数。</p>
+          <div class="beads" id="q-beads-yang"></div>
+          <div class="beads" id="q-beads-yin"></div>
+          <div id="q-missing"></div>
+        </div>
+        <div class="card">
+          <h3><span class="n">0.3</span>结构与魄</h3>
+          <div id="q-struct"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3><span class="n">0.4</span>灵魂积分</h3>
+        <p class="sub">取自 <code>SOUL_SCORE_DB</code>（查询工具的口径），并可补出 <code>SOUL_DB</code> 的天赋 / 使命。</p>
+        <div id="q-soul"></div>
+      </div>
+
+      <div class="card">
+        <h3><span class="n">0.5</span>阴阳倾向</h3>
+        <div id="q-yy"></div>
+      </div>
+
+      <div class="card" id="q-acu-card">
+        <h3><span class="n">0.6</span>养生穴位 · 灵穴推荐</h3>
+        <p class="sub">按<b>主魂 / 辅魂</b>定「先天灵穴」（扬长），按<b>阳格缺数</b>定「后天补漏」（补虚）。
+          取穴一律为各经<b>原穴</b>，与元宝版的取穴口径一致。</p>
+        <div id="q-acu"></div>
+        <p class="hint" style="margin-top:10px">穴位定位属中医经络常识，仅供自我保健参考，<b>不替代诊断与治疗</b>；有疾请就医。</p>
+      </div>
+
+      <div class="card" id="q-zishi-card" style="display:none">
+        <h3><span class="n">0.7</span>子时双格对照</h3>
+        <p class="sub" id="q-zishi-note">—</p>
+        <div id="q-zishi"></div>
+      </div>
+    </section>
+
+    <!-- ============ 1 详细解读 ============ -->
+    <section class="tab" id="tab-1">
+      <div class="card">
+        <h3><span class="n">1</span>阴阳组合详细解读</h3>
+        <p class="sub">取自 <code>grid_interpretations.py</code> 的 <code>COMBO_INTERPRETATIONS</code> 与
+          <code>SINGLE_GRID_INTERPRETATIONS</code>，匹配规则照抄 <code>nine_palace_query.py</code>。</p>
+        <div id="rd-body"></div>
+      </div>
+    </section>
+
+    <!-- ============ 2 跌落路径 ============ -->
+    <section class="tab" id="tab-2">
+      <div id="fp-body"></div>
+    </section>
+
+    <!-- ============ 3 命理报告 ============ -->
+    <section class="tab" id="tab-3">
+      <div class="card no-print">
+        <h3><span class="n">3</span>完整综合命理报告 <span class="tag">v3.9</span></h3>
+        <p class="sub">与 <code>核心引擎/完整综合命理报告v3.9.py</code> 写出的 .md 逐字节一致。</p>
+        <div class="searchbar">
+          <button class="btn ghost sm" data-copy="rp-md" type="button">复制 Markdown</button>
+          <button class="btn ghost sm" data-dl="rp-md" type="button">下载 .md</button>
+          <span class="count" id="rp-count"></span>
+        </div>
+      </div>
+      <div class="card"><div class="md" id="rp-body"></div></div>
+    </section>
+
+    <!-- ============ 4 中医建议 ============ -->
+    <section class="tab" id="tab-4">
+      <div class="card no-print">
+        <h3><span class="n">4</span>倪海厦中医养生建议 <span class="tag">v1.0</span></h3>
+        <p class="sub">与 <code>核心引擎/倪海厦中医建议生成器.py</code> 逐字节一致。仅供学习参考，不替代诊断。</p>
+        <div class="searchbar">
+          <button class="btn ghost sm" data-copy="tm-md" type="button">复制 Markdown</button>
+          <button class="btn ghost sm" data-dl="tm-md" type="button">下载 .md</button>
+          <span class="count" id="tm-count"></span>
+        </div>
+      </div>
+      <div class="card"><div class="md" id="tm-body"></div></div>
+    </section>
+
+    <!-- ============ 5 食疗动功 ============ -->
+    <section class="tab" id="tab-5">
+      <div class="card no-print">
+        <h3><span class="n">5</span>综合食疗动功方案 <span class="tag">v3.3</span></h3>
+        <p class="sub">与 <code>核心引擎/食疗动功生成器v3.3.py</code> 逐字节一致，含「取长补短」与今日行运。</p>
+        <div class="searchbar">
+          <button class="btn ghost sm" data-copy="sl-md" type="button">复制 Markdown</button>
+          <button class="btn ghost sm" data-dl="sl-md" type="button">下载 .md</button>
+          <span class="count" id="sl-count"></span>
+        </div>
+      </div>
+      <div class="card"><div class="md" id="sl-body"></div></div>
+    </section>
+
+    <!-- ============ 6 时空行运 ============ -->
+    <section class="tab" id="tab-6">
+      <div class="card">
+        <h3><span class="n">6</span>时空行运 · 天时与命盘共振</h3>
+        <p class="sub">选一个日期，看当日天时格与本命缺格的共振等级。一级＝同类缺（能量缺口最大），二级＝交叉缺。</p>
+        <div class="frow" style="max-width:520px">
+          <div class="fld">
+            <label for="fDay">行运日期</label>
+            <input id="fDay" type="date" min="1900-01-01" max="2101-12-31">
+          </div>
+          <div class="fld">
+            <label for="fDayShichen">当日时辰</label>
+            <select id="fDayShichen"></select>
+          </div>
+          <div class="fld" style="flex-direction:row;align-items:flex-end">
+            <button class="btn" id="btnDay" type="button">查看</button>
+          </div>
+        </div>
+      </div>
+      <div id="ex-body"></div>
+    </section>
+
+    <!-- ============ 7 阴阳周期 ============ -->
+    <section class="tab" id="tab-7">
+      <div class="card">
+        <h3><span class="n">7</span>阴阳格生命周期</h3>
+        <p class="sub">按 <code>CYCLE_PARAMS</code> 的固定周期推演：男性阳格 11.9 年 / 阴格 9.7 年，女性相反，中间夹 2.3 年「换魂」。</p>
+        <div id="cy-body"></div>
+      </div>
+    </section>
+
+    <!-- ============ 8 灵魂·图腾库 ============ -->
+    <section class="tab" id="tab-8">
+      <div class="card">
+        <h3><span class="n">8</span>灵魂积分库</h3>
+        <p class="sub"><code>SOUL_SCORE_DB</code>（82 条）+ <code>SOUL_DB</code>（67 条，含天赋/使命），可搜数字、名称或层级。</p>
+        <div class="searchbar">
+          <input id="dbSearch" type="search" placeholder="搜 28201 / 玉皇 / 先天童子 …" autocomplete="off">
+          <span class="count" id="dbCount"></span>
+        </div>
+        <div class="rows" id="db-body"></div>
+      </div>
+      <div class="card">
+        <h3><span class="n">8.2</span>图腾法器对照</h3>
+        <p class="sub">取自 <code>核心引擎/weapon_rules.py</code>：以 1 开头的代码配法器，多 6 配水元素。</p>
+        <div class="searchbar">
+          <input id="wpSearch" type="search" placeholder="搜代码或法器名 …" autocomplete="off">
+          <span class="count" id="wpCount"></span>
+        </div>
+        <div class="tw"><table id="wpTable"><thead><tr>
+          <th>代码</th><th>法器</th><th>描述</th>
+        </tr></thead><tbody id="wp-body"></tbody></table></div>
+      </div>
+    </section>
+
+    <!-- ============ 9 频率统计 ============ -->
+    <section class="tab" id="tab-9">
+      <div class="card">
+        <h3><span class="n">9.1</span>格稀有度指标 · 你这一组有多难得</h3>
+        <p class="sub">出现概率越低，稀有系数越大，打分越高。双格按<b>稀有系数叠加</b>计算，并对实测值另行校验。</p>
+        <div id="rar-body"></div>
+      </div>
+
+      <div class="card">
+        <h3><span class="n">9.2</span>阴阳格出现频率（1910–2101）</h3>
+        <p class="sub" id="stMeta"></p>
+        <div class="freq2">
+          <div>
+            <h4 class="bh">阳格 · 最常见 15 种</h4>
+            <div class="bars" id="st-yang"></div>
+          </div>
+          <div>
+            <h4 class="bh">阴格 · 最常见 15 种</h4>
+            <div class="bars" id="st-yin"></div>
+          </div>
+        </div>
+        <div style="margin-top:18px">
+          <h4 class="bh">全区间只出现 1 次的格（最稀一档）</h4>
+          <div id="st-single"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3><span class="n">9.3</span>双格组合的出现次数分布</h3>
+        <p class="sub">12,152 种「阳格 × 阴格」组合在 70,127 天里各出现几次。出现 1–2 次的组合约占一半，这类就是「极稀」。</p>
+        <div class="bars" id="st-buckets"></div>
+        <div class="note blue" style="margin-top:12px">
+          读法：一根条 = 一个出现次数档，条形长度 = 落在该档的组合数。
+          <b>组合出现得越少 ⟹ 稀有系数 K = 70,127 / 出现次数 越大 ⟹ 打分越高。</b>
+          打分只跟「出现多少次」有关，与吉凶好坏无关。
+        </div>
+      </div>
+
+      <div class="card">
+        <h3><span class="n">9.4</span>全库检索</h3>
+        <div class="searchbar">
+          <input id="stSearch" type="search" placeholder="输入一个格（如 28101 / 347）；输入两个格则按「阳格 阴格」算双格稀有度" autocomplete="off">
+          <span class="count" id="stCount"></span>
+        </div>
+        <div id="st-detail"></div>
+      </div>
+    </section>
+
+    <!-- ============ 10 算法与校验 ============ -->
+    <section class="tab" id="tab-10">
+      <div class="card">
+        <h3><span class="n">10.1</span>阳格怎么算</h3>
+        <div id="al-body"></div>
+      </div>
+      <div class="card">
+        <h3><span class="n">10.2</span>一致性校验</h3>
+        <p class="sub">本页所有数字都由 JS 现算，未硬编码任何结果。</p>
+        <div id="al-verify"></div>
+      </div>
+      <div class="card">
+        <h3><span class="n">10.3</span>移植时发现的六个源侧问题</h3>
+        <div id="al-issues"></div>
+      </div>
+    </section>
+
+    <!-- ============ 11 历史档案 · 生辰参数数据表 ============ -->
+    <section class="tab" id="tab-11">
+      <div class="card">
+        <h3><span class="n">11</span>查询记录 · 生辰参数数据表 <span class="tag">自动保存</span></h3>
+        <p class="sub">
+          每次完成一次解读（点「开始解读」、回车或改动生辰参数）后，<b>7 项生辰参数与结果摘要自动存入本表</b>。
+          <b>默认按名单去重：同名只留最新一条</b>（全表查重，不只是跟最近一条比），合并后累加查询次数；
+          开机、每次查询、导入 JSON 时都会自动跑一遍，历史遗留的重复名单一并清掉。
+          需要保留同一人不同生辰的命盘时，把「去重口径」切到「名单 + 生辰信息」。
+          点「载入」把参数调回上方表单，重新算出完整 11 页结果。
+        </p>
+        <div class="hist-bar">
+          <span class="count" id="histCount">—</span>
+          <label class="hist-sw"><input type="checkbox" id="histAuto" checked> 自动保存</label>
+          <label class="hist-sw">去重口径
+            <select id="histMode" class="hist-sel">
+              <option value="name" selected>仅名单（同名留最新，默认）</option>
+              <option value="full">名单 + 生辰信息</option>
+            </select>
+          </label>
+          <button class="btn ghost sm" id="histDedup" type="button">立即去重</button>
+          <button class="btn ghost sm" id="histUndo" type="button" disabled>撤销去重</button>
+          <button class="btn ghost sm" id="histCsv" type="button">导出 CSV</button>
+          <button class="btn ghost sm" id="histJson" type="button">导出 JSON</button>
+          <button class="btn ghost sm" id="histImport" type="button">导入 JSON</button>
+          <button class="btn ghost sm" id="histClear" type="button">清空</button>
+          <input type="file" id="histFile" accept=".json,application/json" hidden>
+        </div>
+        <p class="hint" id="histHint"></p>
+        <p class="hint" id="histStat"></p>
+        <p class="hint" id="histSortHint">
+          表头可点排序：<b>数值列先降序排行</b>（稀有度、灵魂★、次数、查询时间），
+          <b>文字列先升序</b>（姓名按姓名拼音首字母 A→Z）。同一表头再点一次反向，点第三次恢复默认「查询时间从新到旧」。
+          <a href="#" id="histSortReset">还原默认排序</a>　当前排序：<b id="histSortNow">查询时间 ↓（默认）</b>
+        </p>
+        <p class="hint"><b>隐私（C8）：</b>本表只存在本机浏览器 localStorage，<b>不上传任何服务器</b>；
+          导出的 CSV / JSON 含私人信息，<b>请勿上传到 GitHub、网盘或分享链接</b>。
+          清缓存会丢，跨设备请用「导出 JSON → 导入」迁移。</p>
+        <div class="tw"><table class="hist-tbl" id="histTable"><thead><tr>
+          <th class="no-sort">操作</th>
+          <th class="s-th" data-sort="ts" title="点一次从新到旧，再点从旧到新">查询时间</th>
+          <th class="s-th" data-sort="name" title="按姓名拼音首字母排序（A→Z）">姓名</th>
+          <th class="s-th" data-sort="birth" title="按生日先后">阳历生日</th>
+          <th class="s-th" data-sort="shichen">时辰</th>
+          <th class="s-th" data-sort="gender">性别</th>
+          <th class="s-th" data-sort="clock">出生钟点</th>
+          <th class="s-th" data-sort="city" title="按出生地拼音排序">出生地</th>
+          <th class="s-th" data-sort="rule">子时规则</th>
+          <th class="s-th" data-sort="yang">阳格</th>
+          <th class="s-th" data-sort="yin">阴格</th>
+          <th class="s-th" data-sort="yangQue">阳缺</th>
+          <th class="s-th" data-sort="yinQue">阴缺</th>
+          <th class="s-th" data-sort="type">类型</th>
+          <th class="s-th" data-sort="soul" title="按灵魂积分（★ 数，6 最高）排行">灵魂<span class="hunit">★</span></th>
+          <th class="s-th" data-sort="rar" title="按稀有度打分（0–100，越高越稀）排行">稀有度</th>
+          <th class="s-th" data-sort="hits" title="按查询次数排行">次数</th>
+        </tr></thead><tbody id="histBody"></tbody></table></div>
+        <p class="hint">
+          数据只保存在<b>本机浏览器 localStorage</b>，不上传任何服务器；换浏览器、清缓存或隐私模式会读不到，
+          建议定期「导出 JSON」备份，换设备时用「导入 JSON」恢复。CSV 可直接用 Excel 打开。
+          <b>去重不会静默丢数据</b>：每次合并前会在本机留一份「撤销去重」快照（保留最近一次），
+          恢复后口径自动回到最保守的「名单 + 生辰信息」；若需长期保留同名但不同生辰的多条记录，请先导出 JSON。
+        </p>
+      </div>
+    </section>
+
+  </main>
+</div>
