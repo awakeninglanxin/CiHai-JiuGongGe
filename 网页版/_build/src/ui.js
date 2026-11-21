@@ -24,7 +24,42 @@
   };
   var TREND_CLS = { '偏阴': 'n', '偏阳': 'y', '平衡': '', '无': '' };
 
-  var state = { f: null, res: null, md: {}, tab: 0, saveNext: false, suppressSave: false, histOk: true };
+  var state = { f: null, res: null, md: {}, tab: 0, saveNext: false, suppressSave: false, histOk: true,
+    region: '', regionSource: '', regionTried: false };
+  try {
+    state.region = localStorage.getItem('ch_region') || '';
+    state.regionSource = localStorage.getItem('ch_region_src') || '';
+  } catch (e) { }
+  /* 应地药膳定位：浏览器定位 → 内嵌城市经纬度表 → 气候区；全程零网络请求 */
+  function saveRegion(r, src) {
+    state.region = r || '';
+    state.regionSource = src || '';
+    try {
+      localStorage.setItem('ch_region', state.region);
+      localStorage.setItem('ch_region_src', state.regionSource);
+    } catch (e) { }
+    /* 只重绘食养区，绝不走 userRun()（那会触发自动留痕） */
+    if (state.f) { try { renderEx(); } catch (e) { } }
+  }
+  function geoLocate() {
+    state.regionTried = true;
+    if (!navigator.geolocation) { saveRegion('', '浏览器不支持定位，请用手选'); return; }
+    try {
+      navigator.geolocation.getCurrentPosition(function (pos) {
+        var B = window.BAZI;
+        var r = B ? B.regionOfLatLon(pos.coords.latitude, pos.coords.longitude, D.CITY) : '';
+        saveRegion(r, r ? '自动定位到' + r : '定位成功但未匹配城市，用全国通用');
+      }, function () {
+        saveRegion(state.region || '', '定位未授权/失败，保留当前选择');
+      }, { timeout: 8000, maximumAge: 86400000 });
+    } catch (e) { saveRegion(state.region || '', '定位不可用，保留当前选择'); }
+  }
+  function setRegionFromInput() {
+    var v = ($('fRegionCity') || {}).value || '';
+    var B = window.BAZI;
+    var r = B ? B.regionOfCity(v) : '';
+    saveRegion(r, r ? '手选：' + v : '城市未识别，用全国通用');
+  }
 
   function $(id) { return document.getElementById(id); }
   function esc(s) { return MD.esc(s == null ? '' : s); }
@@ -85,8 +120,6 @@
   /* ══════════ 历史档案 · 生辰参数数据表（localStorage） ══════════ */
   var HIST_KEY = 'cihai9_records_v1';
   var HIST_AUTO_KEY = 'cihai9_autosave_v1';
-  var HIST_DEDUP_KEY = 'cihai9_dedup_mode_v2';   /* name（默认）| full；v1 旧键不继承 */
-  var HIST_UNDO_KEY = 'cihai9_dedup_undo_v1';    /* 最近一次去重前的快照 */
   var HIST_MAX = 500;
   var HIST_FIELDS = ['name', 'birth', 'shichen', 'gender', 'clock', 'city', 'rule'];
   var HIST_IDS = {
@@ -233,11 +266,9 @@
     catch (e) { return true; }
   }
   /* 归一化：去空白（含全角）、生日统一 YYYY/MM/DD、字段带名前缀。
-     师命 2026-11-14「重复名单 + 生辰信息就要去除」：**默认按【名单】去重**，同名只留最新一条
+     师命 2026-11-14「重复名单 + 生辰信息就要去除」：**按【名单】去重**，同名只留最新一条
      —— 老师截图里 28 条正是同一批人反复试生日 / 时辰 / 性别留下的，7 项全等口径一条都合并不掉。
-     另保留「名单 + 生辰信息」口径，供需要保留同一人不同命盘时切换。
-     ⚠️ 口径键升到 v2：旧 v1 里存过 full 的浏览器刷新后一律回落到新默认 name，
-     否则只改代码默认不生效（2026-11-14 实坑）。 */
+     师命 2026-11-21：去重口径固定「仅名单」，删掉「名单 + 生辰信息」选项与切换逻辑。 */
   function normVal(v) {
     return String(v == null ? '' : v).replace(/[\s\u3000]/g, '');
   }
@@ -246,19 +277,11 @@
     var m = /^(\d{4})\/(\d{1,2})\/(\d{1,2})$/.exec(s);
     return m ? (m[1] + '/' + ('0' + m[2]).slice(-2) + '/' + ('0' + m[3]).slice(-2)) : s;
   }
-  function histMode() {
-    try { return localStorage.getItem(HIST_DEDUP_KEY) === 'full' ? 'full' : 'name'; }
-    catch (e) { return 'name'; }
-  }
-  function histSetMode(m) {
-    try { localStorage.setItem(HIST_DEDUP_KEY, m === 'full' ? 'full' : 'name'); } catch (e) { }
-  }
-  function histKey(f, mode) {
+  function histMode() { return 'name'; }   /* 口径固定：仅名单（同名留最新） */
+  /* 师命 2026-11-21：不再提供口径切换，histSetMode 一并移除 */
+  function histKey(f) {
     f = f || {};
-    if (mode === 'name') return 'N:' + normVal(f.name);
-    return 'F:' + HIST_FIELDS.map(function (k) {
-      return k + '=' + (k === 'birth' ? normBirth(f[k]) : normVal(f[k]));
-    }).join('\u0001');
+    return 'N:' + normVal(f.name);
   }
   /* 全表去重：按 ts 倒序保留最新一条，同组合并 hits。返回 {records, merged} */
   function histDedup(a, mode) {
@@ -273,34 +296,16 @@
     });
     return { records: out, merged: merged };
   }
-  /* 自动去重：写盘前留一份可撤销快照，绝不静默丢数据 */
+  /* 自动去重：每次合并同名只留最新一条（口径固定「仅名单」） */
   function histAutoDedup(silent) {
     var a = histRead();
     if (a.length < 2) return 0;
-    /* 快照必须在去重前深拷贝：histDedup 会原地排序并累加 hits */
-    var snap = JSON.parse(JSON.stringify(a));
     var res = histDedup(a, histMode());
     if (!res.merged) return 0;
-    try {
-      localStorage.setItem(HIST_UNDO_KEY, JSON.stringify({
-        at: new Date().toISOString(), mode: histMode(), records: snap
-      }));
-    } catch (e) { }
     state.histOk = histWrite(res.records);
-    state.histMerged = res.merged;   /* 只报最近一次，避免切口径后显示累计值误导 */
+    state.histMerged = res.merged;
     if (!silent && state.tab === 11) renderHist();
     return res.merged;
-  }
-  function histUndo() {
-    var snap = null;
-    try { snap = JSON.parse(localStorage.getItem(HIST_UNDO_KEY) || 'null'); } catch (e) { }
-    if (!snap || !Array.isArray(snap.records)) { window.alert('没有可撤销的去重记录。'); return; }
-    if (!window.confirm('恢复上次去重前的 ' + snap.records.length + ' 条记录？当前表会被替换。')) return;
-    state.histOk = histWrite(snap.records);
-    try { localStorage.removeItem(HIST_UNDO_KEY); } catch (e) { }
-    histSetMode('full');           /* 撤销后临时切最保守口径，避免刷新又合并；要按名单再切回来 */
-    state.histMerged = 0;
-    renderHist();
   }
   function histSummary(r) {
     var soul = '';
@@ -346,29 +351,14 @@
     $('histCount').textContent = '共 ' + a.length + ' 条记录' +
       (a.length >= HIST_MAX ? '（已达上限 ' + HIST_MAX + '，最旧的会被淘汰）' : '');
     $('histAuto').checked = histAutoOn();
-    $('histMode').value = mode;
-    var undoSnap = null;
-    try { undoSnap = JSON.parse(localStorage.getItem(HIST_UNDO_KEY) || 'null'); } catch (e) { }
-    $('histUndo').disabled = !(undoSnap && Array.isArray(undoSnap.records));
-    /* 两种口径各能剩多少，直接摆出来，老师不用猜 */
-    var nFull = a.length ? histDedup(JSON.parse(JSON.stringify(a)), 'full').records.length : 0;
-    var nName = a.length ? histDedup(JSON.parse(JSON.stringify(a)), 'name').records.length : 0;
-    $('histStat').innerHTML = '当前口径 <b>' +
-      (mode === 'name' ? '仅名单（同名留最新）' : '名单 + 生辰信息') +
-      '</b>；口径预览：仅名单剩 <b>' + nName + '</b> 人，名单 + 生辰信息剩 <b>' + nFull + '</b> 条。' +
-      ' 切换口径立即自动重跑，重复记录可撤销恢复。' +
-      '<br><span style="color:#a8452a">为什么还有这么多条：</span>「名单 + 生辰信息」口径要求姓名与 7 项' +
-      '生辰参数<b>全部相同</b>才算重复；同一人反复试生日 / 时辰 / 性别时每项都不同，' +
-      '一条都不会合并 —— 要按人收敛请切「仅名单」（本页默认）。';
+    $('histStat').innerHTML = '当前口径 <b>仅名单（同名留最新）</b>；同名记录只保留最新一条并累加查询次数。';
     var msg = '';
     if (state.histOk === false)
       msg = '<b style="color:#a8452a">本机存储写入失败</b>（隐私模式或空间满），请及时导出 JSON 备份。';
     else if (state.histTrimmed)
       msg = '记录已达 ' + HIST_MAX + ' 条上限，最旧的已自动淘汰，建议导出 JSON 留存。';
     if (state.histMerged)
-      msg += (msg ? '<br>' : '') + '已自动合并 <b>' + state.histMerged + '</b> 条重复记录，' +
-        '可点「撤销去重」恢复（恢复后临时切到「名单 + 生辰信息」，避免刷新又合并；' +
-        '要按名单去重请切回「仅名单」）。';
+      msg += (msg ? '<br>' : '') + '已自动合并 <b>' + state.histMerged + '</b> 条重复记录。';
     $('histHint').innerHTML = msg;
     /* 空态不设表格最小宽度，窄屏下提示文字才不会被推到滚动区外 */
     $('histTable').classList.toggle('is-empty', !a.length);
@@ -422,7 +412,11 @@
       if (!el) return;
       var v = rec.f[k] == null ? '' : rec.f[k];
       /* run() 把生日改成 1990/05/08，而 date input 只收 YYYY-MM-DD ⇒ 载入时转回 ISO */
-      el.value = (k === 'birth') ? isoFromSlash(v) : v;
+      if (k === 'birth') v = isoFromSlash(v);
+      /* 主时辰下拉已删「子时」泛指项（前/后子时更精确）。旧记录里存的是「子时」时
+         映射到「后子时」：引擎对二者按同一口径（−1 天）计算，结果不变，且回填不会落空。 */
+      if (k === 'shichen' && v === '子时') v = '后子时';
+      el.value = v;
     });
     state.suppressSave = true;
     try { run(); } finally { state.suppressSave = false; }
@@ -492,16 +486,8 @@
           });
           added++;
         });
-        var snap = JSON.parse(JSON.stringify(a));
         var res = histDedup(a, mode);
-        if (res.merged) {
-          try {
-            localStorage.setItem(HIST_UNDO_KEY, JSON.stringify({
-              at: new Date().toISOString(), mode: mode, records: snap
-            }));
-          } catch (e) { }
-          state.histMerged = res.merged;
-        }
+        if (res.merged) state.histMerged = res.merged;
         if (res.records.length > HIST_MAX) { res.records.length = HIST_MAX; state.histTrimmed = true; }
         state.histOk = histWrite(res.records);
         renderHist();
@@ -525,18 +511,6 @@
       this.value = '';
     });
     $('histClear').addEventListener('click', histClear);
-    $('histMode').addEventListener('change', function () {
-      histSetMode(this.value);
-      var n = histAutoDedup(true);
-      renderHist();
-      if (n) window.alert('已按新口径合并 ' + n + ' 条重复记录，可点「撤销去重」恢复。');
-    });
-    $('histDedup').addEventListener('click', function () {
-      var n = histAutoDedup(true);
-      renderHist();
-      window.alert(n ? ('已合并 ' + n + ' 条重复记录，可点「撤销去重」恢复。') : '当前没有重复记录。');
-    });
-    $('histUndo').addEventListener('click', histUndo);
     /* 表头排序：数值列先降序（稀有度最高、灵魂★最多、次数最多在最上面），文字列先升序；
        同一列再点反向，第三次回默认。排序只改显示顺序，不动 localStorage 里的记录顺序。 */
     $('histTable').addEventListener('click', function (e) {
@@ -567,6 +541,44 @@
   }
 
   /* ══════════ 主流程 ══════════ */
+  /* 钟点 / 出生地变化时，把「时辰」下拉自动同步到真太阳时对应的时辰。
+     师命 2026-11-21：两个因素都要考虑——
+       · 钟点 + 出生地（城市或经纬度）齐全 → 按真太阳时 trueSolar 的小时定时辰；
+       · 只填钟点、没填出生地 → 按钟表时的小时定时辰（无经度修正）；
+       · 钟点清空 → 不动时辰（保留用户已选）。
+     子时在下拉里细分为前/后：23 点→前子时，0 点→后子时，其余沿用 hourToShichen。 */
+  function shichenFromHour(h) {
+    if (h === 23) return '前子时';
+    if (h === 0) return '后子时';
+    return M.hourToShichen(h);
+  }
+  function syncShichenFromClock() {
+    var clock = ($('fClock').value || '').trim();
+    if (!clock) return false;                       /* 钟点清空：不改时辰 */
+    var hm = clock.split(':');
+    if (hm.length < 2 || isNaN(+hm[0]) || isNaN(+hm[1])) return false;
+    var h = +hm[0], mi = +hm[1];
+    if (h < 0 || h > 23 || mi < 0 || mi > 59) return false;
+    var city = ($('fCity').value || '').trim(), useHour = h;
+    if (city) {
+      var c = M.lookupCity(city, D.CITY);
+      if (c) {
+        var bd = M.parseDate($('fBirth').value);
+        if (bd) {
+          var ts = M.trueSolar(bd.y, bd.m, bd.d, h, mi, c[0], c[1], 8);
+          useHour = ts.hour;
+        }
+      }
+    }
+    var target = shichenFromHour(useHour);
+    var sel = $('fShichen');
+    if (sel.value === target) return false;         /* 没变，不触发重复重算 */
+    /* 目标值必须在下拉里存在（前子时/后子时/各时辰）；「未知」等兜底不写 */
+    var opt = sel.querySelector('option[value="' + target + '"]');
+    if (!opt) return false;
+    sel.value = target;
+    return true;
+  }
   function run() {
     var f = readForm();
     var bd = M.parseDate(f.birth);
@@ -591,6 +603,9 @@
 
     var r = M.calc(f.birth, f.shichen, f.gender, f.rule);
     state.res = r;
+    /* 四柱八字阴阳五行倾向（2026-11-21 师命替换旧数字→脏腑判法） */
+    try { state.bazi = (window.BAZI ? window.BAZI.analyze(f.birth, f.clock, f.gender, f.shichen) : null); }
+    catch (e) { state.bazi = null; }
     state.lunar = r.a.lunar;
 
     /* 三份报告 Markdown（只算一次，后续复制/下载直接取） */
@@ -730,6 +745,57 @@
       '</div></div>';
   }
 
+  /* 四柱八字 · 阴阳五行倾向卡片（师命 2026-11-21） */
+  function renderBaziYY() {
+    var b = state.bazi, box = $('q-yy');
+    if (!b || !b.ok) {
+      box.innerHTML = '<div class="empty">缺少时辰信息，无法排四柱八字。请填「时辰」或「出生钟点」后重算。</div>';
+      return;
+    }
+    var wxColor = { '木': '#3f7d52', '火': '#b4442a', '土': '#9c7a2b', '金': '#8a8f98', '水': '#2f6d8f' };
+    var h = '';
+    /* 四柱干支表 */
+    h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">';
+    b.pillars.forEach(function (p) {
+      var isDay = p.name === '日柱';
+      h += '<div class="big ' + (isDay ? 'yang' : '') + '" style="margin:0;padding:8px 6px;text-align:center">' +
+        '<div class="k" style="letter-spacing:1px">' + p.name + (isDay ? ' · 日主' : '') + '</div>' +
+        '<div class="v" style="font-size:24px">' + esc(p.gan) + '<br>' + esc(p.zhi) + '</div>' +
+        '<div class="m" style="font-size:11px">' + esc((window.LunarUtil ? window.LunarUtil.WU_XING_GAN[p.gan] : '') + '·' +
+          (window.LunarUtil ? window.LunarUtil.WU_XING_ZHI[p.zhi] : '')) + '</div>' +
+        '<div class="m" style="font-size:10.5px;color:var(--ink3)">藏 ' + esc(p.hide.join('')) + '</div>' +
+        '</div>';
+    });
+    h += '</div>';
+    h += '<div class="m" style="margin-bottom:10px">八字：<b style="font-family:var(--mono);font-size:15px">' + esc(b.ganZhi) +
+      '</b>　日主 <b>' + esc(b.dayGan) + '(' + esc(b.dayWx) + ')</b> · ' + esc(b.dayYy) +
+      '　农历 ' + esc(b.lunarDate) + '</div>';
+
+    /* 五行综合倾向得分 */
+    h += '<div style="font-size:13px;font-weight:600;margin:10px 0 6px">五行综合倾向得分（含藏干 + 月令旺衰加权）</div>';
+    h += '<div class="bars">';
+    b.ranked.forEach(function (wx) {
+      var pct = b.pct[wx], w = (b.wangOf[wx] || '');
+      h += '<div class="bar"><span class="c" style="color:' + wxColor[wx] + '">' + wx + (wx === b.dominant ? ' ★' : '') + '</span>' +
+        '<span class="t"><i style="width:' + Math.min(100, pct) + '%;background:' + wxColor[wx] + '"></i></span>' +
+        '<span class="n">' + pct + '%　' + b.weighted[wx].toFixed(1) + '</span></div>';
+    });
+    h += '</div>';
+    h += '<div class="m" style="margin-top:6px">主导五行 <b>' + esc(b.dominant) + '</b>　最弱 <b>' + esc(b.weakest) + '</b>' +
+      (b.wangApplied.length ? '　月令旺衰：' + esc(b.wangApplied.join('，')) : '') + '</div>';
+
+    /* 身强身弱 + 阴阳 */
+    h += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 8px">' +
+      '<span class="tag a">日主 ' + esc(b.body) + '</span>' +
+      '<span class="tag ' + (b.yyTrend === '偏阳' ? 'y' : b.yyTrend === '偏阴' ? 'n' : '') + '">' + esc(b.yyTrend) +
+      '（阳 ' + b.yang + ' · 阴 ' + b.yin + '）</span>' +
+      '<span class="tag lv0">喜用：' + esc(b.favor.join('、') || '—') + '</span></div>';
+    h += '<div class="m">身强判定：' + (b.reasons.length ? esc(b.reasons.join('；')) : '不得令、不得地、不得生') + '（得 ' + b.strength + '/3 项）。</div>';
+    h += '<div class="m">阳干支：' + esc(b.yangList.join(' ')) + '　阴干支：' + esc(b.yinList.join(' ')) + '</div>';
+    h += '<p class="hint" style="margin-top:10px">' + esc(b.note) + '</p>';
+    box.innerHTML = h;
+  }
+
   function renderQ() {
     var r = state.res, f = state.f;
     var isZ = r.isZishi;
@@ -764,17 +830,26 @@
        子时（含"子时"泛指）出两副：当天格 + 调整格（按换日规则算的另一套）。 */
     if ($('q-plates')) {
       var b = r.b, bsd = b ? (b.soulDetail || {}) : {};
+      var pel = $('q-plates');
+      /* 子时 4 格必须 2×2 一屏可见；单列堆 4 副要滚 6 屏，用户会以为只出了 2 副。 */
+      pel.className = 'plates' + (isZ ? ' four' : '');
       var pHtml =
         plateCard('yang', '阳格九宫 · 当天', r.yang, r.yangQue, a.po, sd, 'yang', r.date) +
         plateCard('yin', '阴格九宫 · 当天', r.yin, r.yinQue, a.lunarPo, sd, 'yin', r.date);
       if (isZ) {
-        pHtml += '<div class="plate-group">' +
-          (r.isQian ? '前子时' : '后子时') + ' · 调整格 ' + esc(r.adjDate) +
-          '（' + esc(ruleName(r.rule)) + '）</div>' +
+        /* 前/后子时的换日方向必须写在标题上，否则四格看着一样、不知道差别在哪。 */
+        var shiTxt = r.shichen === '前子时'
+          ? '前子时 23:00–24:00 · 换到次日（+1 天）'
+          : r.shichen === '后子时'
+            ? '后子时 00:00–01:00 · 换到前一日（−1 天）'
+            : '子时（泛指）· 当前按后子时口径 −1 天；想看 +1 天请在时辰里选「前子时」';
+        pHtml += '<div class="plate-group">' + esc(shiTxt) +
+          '　→　调整格 ' + esc(r.adjDate) +
+          '　·　共 <b>4 格</b>：当天阳/阴 + 调整阳/阴</div>' +
           plateCard('yang', '阳格九宫 · 调整', r.yang1, r.yangQue1, b.po, bsd, 'yang', r.adjDate) +
           plateCard('yin', '阴格九宫 · 调整', r.yin1, r.yinQue1, b.lunarPo, bsd, 'yin', r.adjDate);
       }
-      $('q-plates').innerHTML = pHtml;
+      pel.innerHTML = pHtml;
     }
     $('q-struct').innerHTML =
       '<dl class="kv">' +
@@ -822,18 +897,8 @@
     }
     $('q-soul').innerHTML = soulHtml;
 
-    /* 阴阳倾向 */
-    function yyBlock(title, g, yy) {
-      var cls = TREND_CLS[yy.trend] || '';
-      return '<div class="big ' + cls + '" style="margin-bottom:10px">' +
-        '<div class="k">' + title + ' · ' + esc(g) + '</div>' +
-        '<div style="font-size:17px;font-weight:600;margin:4px 0">' + esc(yy.trend) +
-        ' <span style="font-size:12.5px;font-weight:400;color:var(--ink3)">阴 ' + yy.yin + ' · 阳 ' + yy.yang + '</span></div>' +
-        '<div class="m">阴数字：' + (yy.yinD.length ? esc(yy.yinD.join(' ')) : '无') + '</div>' +
-        '<div class="m">阳数字：' + (yy.yangD.length ? esc(yy.yangD.join(' ')) : '无') + '</div>' +
-        '</div>';
-    }
-    $('q-yy').innerHTML = yyBlock('阳格', r.yang, r.yyYang) + yyBlock('阴格', r.yin, r.yyYin);
+    /* 阴阳倾向 · 四柱八字版（2026-11-21 师命：替换旧数字→脏腑判法） */
+    renderBaziYY();
 
     /* 子时双格 */
     var zc = $('q-zishi-card');
@@ -938,7 +1003,7 @@
       html += '</div>';
 
       html += '<div class="acu-sec"><div class="acu-sec-n-sub">' + esc(plabel) +
-        ' · 后天灵穴 · 补漏培元　缺数 ' + esc(q || '无') + '</div>';
+        ' · 后天灵穴 · <span class="acu-red">补漏培元</span>　缺数 ' + esc(q || '无') + '</div>';
       if (!q) {
         html += '<p class="sub">' + esc(plabel) + '无缺数，无需补漏。</p>';
       } else {
@@ -1484,7 +1549,151 @@
     }
     html += '</div>';
 
+    /* 6.3 今日衣食住行开运建议（四柱八字 + 当日行运，师命 2026-11-21） */
+    html += '<div class="card"><h3><span class="n">6.3</span>今日衣食住行 · 四柱开运建议</h3>';
+    var adv = null;
+    try {
+      adv = (window.BAZI && state.bazi)
+        ? window.BAZI.dayAdvice(state.bazi, day,
+          { l1: y.l1, l2: y.l2, digitOrgan: D.DIGIT_ORGAN }, state.region) : null;
+    }
+    catch (e) { adv = null; }
+    if (!adv) {
+      html += '<p class="sub">需先填时辰或出生钟点排出四柱，方可给开运建议。</p>';
+    } else {
+      var o = adv.open;
+      html += '<p class="sub">本命 <b>' + esc(adv.body) + '</b>，喜用 ' + esc(adv.favor.join('、')) +
+        '；当日 <b>' + esc(adv.dayGz) + '</b>（日干' + esc(adv.dayWx) + '）。' +
+        '综合今日宜补 <b style="color:var(--accent)">' + esc(adv.best) + '</b>' +
+        (adv.second !== adv.best ? '，次宜 ' + esc(adv.second) : '') +
+        '，宜避 <b>' + esc(adv.avoid) + '</b>。</p>';
+      /* 养生饮食：节气 × 四柱喜忌 × 九宫脏腑 三方合参（师命 2026-11-21） */
+      var dt = adv.diet;
+      var dietRow = function (label, text) {
+        return '<div style="display:grid;grid-template-columns:70px 1fr;gap:8px;margin:4px 0;' +
+          'font-size:12.5px;line-height:1.65;align-items:start">' +
+          '<b style="color:var(--accent);white-space:nowrap;font-weight:600">' + esc(label) + '</b>' +
+          '<span style="color:var(--ink2)">' + esc(text) + '</span></div>';
+      };
+      if (dt) {
+        html += '<div id="dietBlock" style="border:1px solid var(--line);border-left:4px solid var(--accent);' +
+          'border-radius:8px;padding:10px 12px;background:#fafbfc;margin-bottom:10px">' +
+          '<div style="font-size:13px;font-weight:700;margin-bottom:7px;color:var(--ink)">🍲 养生饮食 · ' +
+          esc(dt.name) + '食养' +
+          '<span style="font-weight:400;color:var(--ink3);font-size:12px">　交节 ' + esc(dt.ymd.slice(5).replace('-', '/')) +
+          ' · 时令属' + esc(dt.wx) + ' · 重点养' + esc(dt.organ) + '</span></div>' +
+          '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 8px;' +
+          'font-size:12px;color:var(--ink3)">' +
+          '<b style="color:var(--ink2)">📍 应地定位：</b>' +
+          '<button type="button" id="btnGeo" class="btn" style="padding:3px 9px;font-size:12px">自动定位</button>' +
+          '<input id="fRegionCity" list="cityList" placeholder="或输入城市" ' +
+          'style="width:116px;padding:3px 6px;border:1px solid var(--line);border-radius:5px;font-size:12px">' +
+          '<button type="button" id="btnRegionSet" class="btn" style="padding:3px 9px;font-size:12px">应用</button>' +
+          '<span>' + (state.region ? '当前：' + esc(state.region) : '当前：全国通用') +
+          (state.regionSource ? '（' + esc(state.regionSource) + '）' : '') +
+          '<span style="margin-left:4px">位置仅存本机</span></div>' +
+          dietRow('时令原则', dt.principle) +
+          dietRow('当令食材', dt.food) +
+          dietRow('食疗方', dt.recipe) +
+          dietRow('节气忌口', dt.avoid) +
+          dietRow('命盘底色', dt.constitution + '（八字宜补' + adv.best + '、宜避' + adv.avoid + '）') +
+          dietRow('九宫加减', dt.nineText) +
+          dietRow('合参结论', dt.baseBlend) +
+          dietRow('应地药膳', dt.regional) +
+          dietRow('食疗药膳', dt.therapy) +
+          dietRow('每周药食', dt.weekly) +
+          '<div class="hint" style="margin-top:8px;line-height:1.6">' + esc(dt.warning) + '<br>' + esc(dt.src) + '</div>' +
+          '</div>';
+      }
+      html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px">';
+      var rows = [
+        ['👕 穿衣颜色', o.color], ['🔢 吉利数字', o.num], ['🧭 利运方位', o.dir],
+        ['🫀 重点养护', o.organ],
+        ['💎 饰品材质', o.jade], ['🏃 运动作息', o.act + ' · ' + o.life],
+        ['💼 适宜行业', o.trade]
+      ];
+      rows.forEach(function (r) {
+        html += '<div style="border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:#fff">' +
+          '<div style="font-size:12px;color:var(--ink3);margin-bottom:3px">' + r[0] + '</div>' +
+          '<div style="font-size:13px;line-height:1.5">' + esc(r[1]) + '</div></div>';
+      });
+      html += '</div>';
+      html += '<p class="hint" style="margin-top:10px">' + esc(adv.note) + '</p>';
+    }
+    html += '</div>';
+
+    /* 6.4 双系统五行共鸣（6.2 共振表 × 6.3 四柱开运，师命 2026-11-21） */
+    html += '<div class="card"><h3><span class="n">6.4</span>双系统五行共鸣 · 九宫 × 四柱</h3>';
+    html += '<p class="sub">把 6.2 的共振脏腑与 6.3 的宜补/宜避五行放在一起看，找两套系统的交点。' +
+      '<b>注意：两套系统的数字含义不同，不可直接比对</b>——九宫数字是脏腑编号（3＝心），' +
+      '八字开运数字是河图数理（3＝木）；本表只以<b>五行/脏腑</b>作桥梁。</p>';
+    if (adv && adv.jieqi) {
+      html += '<p class="hint">当前行运节气：<b>' + esc(adv.jieqi.name) + '</b>（时令属' +
+        esc(adv.jieqi.wx) + '）——节气、四柱喜忌、九宫脏腑已在 6.3「养生饮食」中三方合参。</p>';
+    }
+    var res = null;
+    try {
+      res = (window.BAZI && window.BAZI.resonance && adv)
+        ? window.BAZI.resonance(adv, y.l1, y.l2, D.DIGIT_ORGAN) : null;
+    } catch (e) { res = null; }
+    if (!res) {
+      html += '<p class="sub">需先排出四柱并查出共振，方可做双系统关联。</p>';
+    } else {
+      html += '<p class="sub">六二共振 <b>' + esc(rowsDigest(y)) + '</b>；' +
+        '八字宜补 <b style="color:var(--accent)">' + esc(res.best) + '</b>、宜避 <b>' + esc(res.avoid) + '</b>。' +
+        '其中九宫数字只作脏腑编号，经中医脏腑配属转为五行：' +
+        '肝胆木·心小肠火·脾胃土·肺大肠金·肾膀胱水。</p>';
+      if (!res.rows.length) {
+        html += '<div class="note blue">' + esc(res.summary) + '</div>';
+      } else {
+        html += '<div class="tw"><table><thead><tr><th>共振级</th><th>九宫数字·脏腑</th>' +
+          '<th>转属五行</th><th>八字判定</th></tr></thead><tbody>';
+        var toneCls = { good: 'res-good', warn: 'res-warn', mid: 'res-mid', plain: '' };
+        var relLbl = { sync: '🟢 同频加持', clash: '🟠 信号相悖', favor: '🔵 喜用同向',
+          taboo: '🟣 忌神留意', neutral: '⚪ 各自独立' };
+        res.rows.forEach(function (x) {
+          html += '<tr class="' + toneCls[x.tone] + '">' +
+            '<td>' + (x.level === 1 ? '<span class="tag lv1">一级</span>' : '<span class="tag lv2">二级</span>') + '</td>' +
+            '<td class="num"><b>' + esc(x.digit) + '</b>' + (x.organ ? ' ' + esc(x.organ) : '') + '</td>' +
+            '<td>' + esc(x.wx) + '</td>' +
+            '<td style="white-space:nowrap">' + relLbl[x.rel] + '</td></tr>';
+        });
+        html += '</tbody></table></div>';
+        html += '<div style="margin-top:12px"><b style="font-size:12.5px;color:var(--ink2)">逐条关联：</b>' +
+          '<ul style="margin:5px 0 0;padding-left:18px;font-size:13px;line-height:1.7">' +
+          res.rows.map(function (x) {
+            return '<li>' + (x.level === 1 ? '一级' : '二级') + ' ' + esc(x.digit) +
+              (x.organ ? '（' + esc(x.organ) + '）' : '') + '：' + esc(x.desc) + '</li>';
+          }).join('') + '</ul></div>';
+        var resNote = res.nSync
+          ? 'note warn'
+          : (res.nClash ? 'note' : 'note blue');
+        html += '<div class="' + resNote + '" style="margin-top:12px"><b>综合结论</b><br>' + esc(res.summary) + '</div>';
+      }
+      html += '<p class="hint" style="margin-top:10px">五行开运对照取公开子平共识；双系统关联为传统文化研究性推演，' +
+        '两套体系原理不同（九宫重经络脏腑共振、四柱重命局喜用），交点仅供参照，不替代专业建议。</p>';
+    }
+    html += '</div>';
+
     $('ex-body').innerHTML = html;
+    var gb = $('btnGeo'); if (gb) gb.onclick = function () { geoLocate(); };
+    var rb = $('btnRegionSet'); if (rb) rb.onclick = function () { setRegionFromInput(); };
+    /* 默认自动定位：仅顶层窗口（本地直接打开）尝试一次；
+       分享页在 iframe 内不主动请求设备权限，由访客自行点击，避免打扰。 */
+    if (!state.region && !state.regionTried && window.self === window.top) {
+      setTimeout(function () { geoLocate(); }, 300);
+    }
+  }
+  /* 共振数字串摘要：一级/二级各列，如「一级 2、4；二级 7」 */
+  function rowsDigest(y) {
+    var a = [], b = [];
+    if (y && y.l1) a = Array.isArray(y.l1) ? y.l1.map(String) : String(y.l1).split('');
+    if (y && y.l2) b = (Array.isArray(y.l2) ? y.l2.map(String) : String(y.l2).split(''))
+      .filter(function (d) { return a.indexOf(d) < 0; });
+    var s = [];
+    if (a.length) s.push('一级 ' + a.join('、'));
+    if (b.length) s.push('二级 ' + b.join('、'));
+    return s.length ? s.join('；') : '无';
   }
 
   /* ══════════ 7 阴阳周期 ══════════ */
@@ -2049,8 +2258,13 @@
       var bp = (r.b && r.b.po) || '', blp = (r.b && r.b.lunarPo) || '';
       var bsd = (r.b && r.b.soulDetail) || {};
       var savedSd = sd; sd = bsd;   /* onePlate 内部读外层 sd */
-      T(M, y - 12, '—— ' + (r.isQian ? '前子时' : '后子时') + ' · 调整格 ' + svgEsc(r.adjDate) +
-        '（' + svgEsc(ruleName(r.rule)) + '）——', 14, BLUE);
+      var swTxt = r.shichen === '前子时'
+        ? '前子时 23:00–24:00 · 换到次日（+1 天）'
+        : r.shichen === '后子时'
+          ? '后子时 00:00–01:00 · 换到前一日（−1 天）'
+          : '子时（泛指）· 按后子时口径 −1 天';
+      T(M, y - 12, '—— ' + swTxt + ' → 调整格 ' + svgEsc(r.adjDate) +
+        '　·　共 4 格：当天阳/阴 + 调整阳/阴 ——', 14, BLUE);
       y += 12;
       onePlate('阳格九宫 · 调整', r.yang1, r.yangQue1, bp, 'yang', r.adjDate);
       onePlate('阴格九宫 · 调整', r.yin1, r.yinQue1, blp, 'yin', r.adjDate);
@@ -2125,8 +2339,12 @@
       run();
     });
 
-    ['fName', 'fBirth', 'fShichen', 'fGender', 'fClock', 'fCity', 'fRule'].forEach(function (id) {
+    ['fName', 'fBirth', 'fShichen', 'fGender', 'fRule'].forEach(function (id) {
       $(id).addEventListener('change', userRun);
+    });
+    /* 钟点 / 出生地变化：先按真太阳时自动同步时辰，再重算（只跑一次 userRun） */
+    ['fClock', 'fCity'].forEach(function (id) {
+      $(id).addEventListener('change', function () { syncShichenFromClock(); userRun(); });
     });
     $('fBirth').addEventListener('keydown', function (e) { if (e.key === 'Enter') userRun(); });
     bindHist();

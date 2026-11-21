@@ -31,7 +31,6 @@
       <div class="fld">
         <label for="fShichen">时辰</label>
         <select id="fShichen">
-          <option value="子时">子时（23-01，按双格算）</option>
           <option value="前子时">前子时（23:00-00:00）</option>
           <option value="后子时">后子时（00:00-01:00）</option>
           <option value="丑时">丑时（01-03）</option>
@@ -127,7 +126,10 @@
       </div>
 
       <div class="card">
-        <h3><span class="n">0.5</span>阴阳倾向</h3>
+        <h3><span class="n">0.5</span>阴阳五行倾向 · 四柱八字</h3>
+        <p class="sub">按传统子平术：以出生年月日时排<b>四柱干支</b>（lunar-javascript，九龙道长排盘同款算法），
+          十天干、十二地支各分阴阳五行，统计<b>五行综合倾向得分</b>（含地支藏干 + 月令旺衰加权），
+          并据得令 / 得地 / 得生判日主强弱、据干支阴阳个数判偏性。</p>
         <div id="q-yy"></div>
       </div>
 
@@ -329,22 +331,14 @@
         <h3><span class="n">11</span>查询记录 · 生辰参数数据表 <span class="tag">自动保存</span></h3>
         <p class="sub">
           每次完成一次解读（点「开始解读」、回车或改动生辰参数）后，<b>7 项生辰参数与结果摘要自动存入本表</b>。
-          <b>默认按名单去重：同名只留最新一条</b>（全表查重，不只是跟最近一条比），合并后累加查询次数；
+          <b>去重口径固定「仅名单」：同名只留最新一条</b>（全表查重，不只是跟最近一条比），合并后累加查询次数；
           开机、每次查询、导入 JSON 时都会自动跑一遍，历史遗留的重复名单一并清掉。
-          需要保留同一人不同生辰的命盘时，把「去重口径」切到「名单 + 生辰信息」。
           点「载入」把参数调回上方表单，重新算出完整 11 页结果。
         </p>
         <div class="hist-bar">
           <span class="count" id="histCount">—</span>
           <label class="hist-sw"><input type="checkbox" id="histAuto" checked> 自动保存</label>
-          <label class="hist-sw">去重口径
-            <select id="histMode" class="hist-sel">
-              <option value="name" selected>仅名单（同名留最新，默认）</option>
-              <option value="full">名单 + 生辰信息</option>
-            </select>
-          </label>
-          <button class="btn ghost sm" id="histDedup" type="button">立即去重</button>
-          <button class="btn ghost sm" id="histUndo" type="button" disabled>撤销去重</button>
+          <span class="hist-sw fixed">去重口径：仅名单（同名留最新）</span>
           <button class="btn ghost sm" id="histCsv" type="button">导出 CSV</button>
           <button class="btn ghost sm" id="histJson" type="button">导出 JSON</button>
           <button class="btn ghost sm" id="histImport" type="button">导入 JSON</button>
@@ -383,8 +377,7 @@
         <p class="hint">
           数据只保存在<b>本机浏览器 localStorage</b>，不上传任何服务器；换浏览器、清缓存或隐私模式会读不到，
           建议定期「导出 JSON」备份，换设备时用「导入 JSON」恢复。CSV 可直接用 Excel 打开。
-          <b>去重不会静默丢数据</b>：每次合并前会在本机留一份「撤销去重」快照（保留最近一次），
-          恢复后口径自动回到最保守的「名单 + 生辰信息」；若需长期保留同名但不同生辰的多条记录，请先导出 JSON。
+          自动合并同名记录不会静默丢数据，如需保留请先导出 JSON。
         </p>
       </div>
     </section>

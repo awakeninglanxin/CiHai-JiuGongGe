@@ -36,6 +36,8 @@ def main():
     md = read(os.path.join(SRC, "md.js"))
     reports = read(os.path.join(SRC, "reports.js"))
     ui = read(os.path.join(SRC, "ui.js"))
+    lunar_lib = read(os.path.join(SRC, "lunar.js"))   # lunar-javascript 排盘核心（Solar/Lunar/EightChar）
+    bazi = read(os.path.join(SRC, "bazi.js"))         # 四柱八字阴阳五行倾向算法
 
     lunar = json.load(open(os.path.join(HERE, "lunar_table.json"), encoding="utf-8"))
     data = json.load(open(os.path.join(HERE, "data.json"), encoding="utf-8"))
@@ -68,6 +70,12 @@ def main():
     parts.append(reports)
     parts.append('</script>')
     parts.append('<script>')
+    parts.append(lunar_lib)
+    parts.append('</script>')
+    parts.append('<script>')
+    parts.append(bazi)
+    parts.append('</script>')
+    parts.append('<script>')
     parts.append(ui)
     parts.append('</script>')
     parts.append('</body>')
@@ -76,8 +84,8 @@ def main():
     html = "\n".join(parts) + "\n"
     blob = html.encode("utf-8")
 
-    print("来源体积：css %d · body %d · engine %d · md %d · reports %d · ui %d"
-          % (len(css), len(body), len(engine), len(md), len(reports), len(ui)))
+    print("来源体积：css %d · body %d · engine %d · md %d · reports %d · lunar %d · bazi %d · ui %d"
+          % (len(css), len(body), len(engine), len(md), len(reports), len(lunar_lib), len(bazi), len(ui)))
     print("内嵌数据：lunar %d 项 / %d 字节 · data %d 字节"
           % (lunar["n"], len(enc_json(lunar)), len(enc_json(data))))
     print("输出：%s" % OUT)

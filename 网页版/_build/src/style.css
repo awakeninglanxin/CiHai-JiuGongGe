@@ -32,6 +32,10 @@ html,body{margin:0;padding:0}
    ⚠ 导出 PNG 不受影响：那是手写 SVG 的逻辑坐标，不走页面样式。 */
 :root{ --zoom:3 }
 html{ zoom:var(--zoom) }
+/* 窄屏必须降级：3× 下 390px 手机的逻辑视口只剩 130px，标题会被压成每行 4 个字并右侧裁切。
+   媒体查询用的是未缩放的视口宽，所以这里按真实屏宽分档。 */
+@media (max-width:900px){ :root{ --zoom:2 } }
+@media (max-width:600px){ :root{ --zoom:1.35 } }
 /* 打印按原尺寸：300% 会把每页撑爆。版心与盘面列数也一并回原样。 */
 @media print{
   html{ zoom:1 }
@@ -187,6 +191,10 @@ th,td{border:1px solid var(--line);padding:6px 9px;text-align:left;vertical-alig
 th{background:#f7f4ee;font-weight:600;color:var(--ink2);white-space:nowrap}
 tbody tr:nth-child(even){background:#fcfbf8}
 td.num,th.num{font-family:var(--mono);text-align:center;white-space:nowrap}
+/* 6.4 双系统五行共鸣：低饱和行底色 */
+tr.res-good{background:#eef7f1!important}
+tr.res-warn{background:#fdf1ee!important}
+tr.res-mid{background:#eff4f9!important}
 
 /* ===== 报告正文（markdown 渲染） ===== */
 .md{font-size:14.5px;line-height:1.85}
@@ -283,6 +291,7 @@ tr.sumrow td{background:#faf7f0;font-weight:600}
 .hist-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:12px 0 10px}
 .hist-bar .count{font-size:12.5px;color:var(--ink3);white-space:nowrap;margin-right:4px}
 .hist-sw{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;color:var(--ink2);white-space:nowrap;cursor:pointer}
+.hist-sw.fixed{cursor:default;padding:3px 8px;border:1px dashed var(--line);border-radius:6px;color:var(--ink3)}
 .hist-sw input{margin:0;accent-color:var(--accent)}
 .hist-sel{font:inherit;font-size:12.5px;padding:3px 6px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink2)}
 .hist-bar .btn:disabled{opacity:.45;cursor:not-allowed}
@@ -364,6 +373,22 @@ tr.sumrow td{background:#faf7f0;font-weight:600}
 /* 3× 放大后逻辑视口只有约 640px，两副盘并排会把格子撑出视口（阴格第三列被裁）。
    改单列堆叠：每格宽度 ≈ 190 逻辑，数字/格 比例与原版一致，只是整体放大 3 倍。 */
 .plates{display:grid;grid-template-columns:1fr;gap:14px;margin-top:16px}
+/* 子时 4 格（当天阳/阴 + 调整阳/阴）：2×2 一屏看全，字号适度收一档但仍在原版之上。
+   逻辑宽 640 下每副约 300、每格约 92，数字 17px 放得下。手机竖屏回单列。 */
+.plates.four{grid-template-columns:1fr 1fr;gap:10px}
+.plates.four .plate{padding:9px 9px 7px}
+.plates.four .plate-hd{gap:6px;margin-bottom:7px}
+.plates.four .plate-hd .t{font-size:12px}
+.plates.four .plate-hd .g{font-size:10px;letter-spacing:0}
+.plates.four .plate-hd .when{font-size:9px}
+.plates.four .pgrid{gap:4px}
+.plates.four .pcell{border-radius:6px}
+.plates.four .pcell .n{font-size:17px}
+.plates.four .pcell .o{font-size:8.5px;margin-top:2px}
+.plates.four .pcell .mk{font-size:8px}
+.plates.four .pfoot{font-size:9px;line-height:1.45;margin-top:7px}
+.plates.four .plate-group{font-size:11px;line-height:1.5;padding-bottom:4px}
+@media (max-width:600px){ .plates.four{grid-template-columns:1fr} }
 .plate{border:1px solid var(--line);border-radius:var(--radius);background:#fff;padding:12px 12px 10px}
 .plate-hd{display:flex;align-items:baseline;gap:9px;margin-bottom:9px;flex-wrap:wrap}
 .plate-hd .t{font-family:var(--serif);font-weight:700;font-size:14.5px;color:#6b5ce7}
@@ -416,3 +441,4 @@ tr.sumrow td{background:#faf7f0;font-weight:600}
 .acu-sub{font-size:11.5px;color:var(--ink3);margin:10px 0 6px}
 .acu-sec-n-sub{font-family:var(--serif);font-weight:700;font-size:14px;color:#4a3fbf;
   margin:16px 0 8px;padding-top:10px;border-top:1px dashed #e0daf7}
+.acu-red{color:#c0261b}
